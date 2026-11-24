@@ -1,0 +1,1492 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Блоксфера 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Manrope:wght@500;700;800&display=swap">
+<style>
+/* Layout: IDE в один экран — слева холст скриптов, справа 3D-сцена и панель объектов. Тёмная «ночная мастерская». */
+:root{
+  --bg:#0e1122; --panel:#161a30; --panel-2:#1e2340; --line:#2a3156; --fg:#e9ecf8; --muted:#8e95ba;
+  --accent:#ffb627; --run:#2ecf7b; --stop:#ff5d5d; --blue:#5b8cff;
+  --f-display:"Unbounded", "Manrope", system-ui, sans-serif;
+  --f-ui:"Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r:12px;
+  color-scheme:dark;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:14px;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{height:100%;display:flex;flex-direction:column;gap:10px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));box-sizing:border-box}
+
+/* top bar */
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:800;font-size:18px;letter-spacing:.01em;white-space:nowrap}
+.brand em{font-style:normal;background:var(--accent);color:#1a1300;border-radius:6px;padding:1px 6px;font-size:13px}
+.brand svg{width:30px;height:30px}
+#projName{background:transparent;border:1px solid transparent;border-radius:8px;padding:6px 8px;font-weight:700;min-width:0;width:180px;color:var(--fg)}
+#projName:hover,#projName:focus{border-color:var(--line);background:var(--panel)}
+.runctl{display:flex;gap:8px;margin-left:auto}
+.btn{border:1px solid var(--line);background:var(--panel-2);border-radius:10px;padding:8px 12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:#3d4677;background:#252b4d}
+.btn.run{background:var(--run);border-color:var(--run);color:#06210f;padding:8px 18px;font-weight:800}
+.btn.run:hover{filter:brightness(1.08)}
+.btn.stop{background:transparent;border-color:var(--stop);color:var(--stop)}
+.btn.stop:hover{background:rgba(255,93,93,.12)}
+.btn.sm{padding:5px 9px;font-size:12.5px;border-radius:8px}
+.btn.danger{color:var(--stop)}
+.tools{display:flex;gap:6px;align-items:center}
+.menu{position:relative}
+.dropdown{position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;min-width:260px;z-index:40;box-shadow:0 18px 40px rgba(0,0,0,.45);display:flex;flex-direction:column}
+.dropdown button{background:none;border:0;text-align:left;padding:9px 10px;border-radius:8px;font-weight:700}
+.dropdown button:hover{background:var(--panel-2)}
+.dropdown hr{border:0;border-top:1px solid var(--line);margin:4px 2px;width:auto}
+.dropdown small{display:block;color:var(--muted);font-weight:500;font-size:12px}
+
+/* workspace */
+.work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) clamp(380px,40vw,660px);gap:10px}
+.code{position:relative;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:#12162a;min-height:0}
+#blocklyDiv{position:absolute;inset:0}
+.code-top{position:absolute;right:12px;top:10px;z-index:5;display:flex;gap:8px;align-items:center}
+#blockSearch{background:rgba(14,17,34,.92);border:1px solid var(--line);border-radius:999px;padding:6px 14px;width:190px;max-width:40vw}
+#blockSearch:focus{border-color:var(--accent);outline:none}
+#emptyHint{position:absolute;left:50%;top:50%;transform:translate(-30%,-50%);z-index:4;pointer-events:none;text-align:center;color:var(--muted);max-width:340px;line-height:1.55}
+#emptyHint b{display:block;font-family:var(--f-display);font-weight:600;color:var(--fg);font-size:15px;margin-bottom:6px}
+.seg{display:inline-flex;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{border:0;background:none;padding:5px 12px;border-radius:7px;font-weight:800;font-family:var(--f-display);font-size:12px;color:var(--muted)}
+.seg button.on{background:var(--blue);color:#fff}
+.code-tag{background:rgba(14,17,34,.82);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--muted);pointer-events:none;white-space:nowrap}
+.code-tag b{color:var(--fg)}
+.zoom{position:absolute;right:12px;bottom:12px;z-index:5;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:rgba(30,35,64,.92);font-size:18px;font-weight:800}
+.zoom button:hover{border-color:var(--accent)}
+
+.side{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0}
+.stage{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);aspect-ratio:16/10;max-width:100%;background:#9fd3ff;flex-shrink:0}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none}
+.stage:fullscreen{aspect-ratio:auto;border-radius:0}
+#overlay{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.bubble{position:absolute;left:0;top:0;background:#fff;color:#16182a;border-radius:14px;padding:6px 11px;font-weight:800;font-size:13px;max-width:200px;white-space:pre-wrap;box-shadow:0 4px 14px rgba(0,0,0,.25);will-change:transform}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-7px;margin-left:-7px;border:7px solid transparent;border-top-color:#fff;border-bottom:0}
+#hud{position:absolute;left:50%;top:48px;transform:translateX(-50%);font-family:var(--f-display);font-weight:800;font-size:clamp(13px,1.6vw,20px);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.35),0 0 18px rgba(0,0,0,.35);text-align:center;pointer-events:none;max-width:90%}
+#vars{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.var-chip{background:rgba(14,17,34,.78);border-radius:8px;padding:3px 8px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}
+.var-chip span{color:#f2647a;margin-right:6px}
+.stage-tools{position:absolute;right:8px;top:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.stage-tools button{background:rgba(14,17,34,.78);border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700}
+.stage.running .stage-tools [data-mode]{display:none}
+.stage-tools button.on{background:var(--accent);color:#1a1300;border-color:var(--accent)}
+.stage-tools button:hover{border-color:var(--accent)}
+#runBadge{position:absolute;left:10px;bottom:10px;background:var(--run);color:#06210f;font-weight:800;font-size:12px;padding:4px 10px;border-radius:999px;pointer-events:none}
+#askForm{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:6px;background:rgba(14,17,34,.92);padding:8px;border-radius:12px;border:1px solid var(--line)}
+#askForm input{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+
+.panels{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:10px}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.panel h2{margin:0;font-family:var(--f-display);font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.hint{color:var(--muted);font-size:12px}
+.objlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.obj{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1.5px solid transparent;border-radius:10px;padding:7px 8px;text-align:left;min-width:0}
+.obj:hover{border-color:#3d4677}
+.obj.sel{border-color:var(--accent);background:#2a2a3e}
+.obj.drop{border-color:var(--run);background:#1d3a2f}
+.obj .sw{width:26px;height:26px;border-radius:7px;flex-shrink:0;display:grid;place-items:center;font-size:13px;color:rgba(0,0,0,.55);font-weight:800}
+.obj .nm{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.obj .ct{font-size:11px;color:var(--muted);display:block}
+.addbar{display:flex;flex-wrap:wrap;gap:6px}
+.addbar .lbl{color:var(--muted);font-size:12px;align-self:center;margin-right:2px}
+.props{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.props label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--muted);font-weight:700;min-width:0}
+.props .w2{grid-column:span 2}.props .w3{grid-column:span 3}
+.props input,.props select{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0;width:100%;box-sizing:border-box;font-variant-numeric:tabular-nums}
+.props input[type=color]{padding:2px;height:32px}
+
+/* modal + toasts */
+.modal{position:fixed;inset:0;background:rgba(5,7,16,.6);display:grid;place-items:center;z-index:100;padding:16px}
+.dlg{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;width:min(440px,100%);display:flex;flex-direction:column;gap:12px;box-shadow:0 30px 60px rgba(0,0,0,.5)}
+.dlg h3{margin:0;font-family:var(--f-display);font-size:16px;font-weight:600}
+.dlg p{margin:0;color:var(--muted);line-height:1.6;white-space:pre-line}
+.dlg input,.dlg textarea{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.dlg textarea{min-height:160px;font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical}
+.dlg-actions{display:flex;justify-content:flex-end;gap:8px}
+#toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:120;align-items:center;pointer-events:none;width:min(560px,calc(100% - 32px))}
+.toast{background:#252b4d;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.4);animation:tin .2s ease-out}
+.toast.err{border-color:var(--stop);color:#ffd0d0}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+
+/* Blockly polish */
+.blocklyToolboxDiv{padding-top:6px}
+.blocklyTreeRow{height:34px!important;line-height:34px!important;margin-bottom:2px!important;border-radius:0 10px 10px 0;padding-right:12px!important}
+.blocklyTreeLabel{font-family:var(--f-ui)!important;font-weight:700!important;font-size:13px!important}
+.blocklyTreeSelected .blocklyTreeLabel{color:#fff!important}
+.blocklyWidgetDiv .blocklyMenu,.blocklyDropDownDiv{font-family:var(--f-ui)!important}
+
+@media (max-width:900px){
+  body{overflow:auto}
+  .app{height:auto;min-height:100%}
+  .work{grid-template-columns:minmax(0,1fr)}
+  .side{order:-1}
+  .code{height:72vh}
+  .panels{overflow:visible}
+  .props{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .props .w3,.props .w2{grid-column:span 3}
+  #projName{width:130px}
+}
+@media (max-width:520px){ .tools .wide{display:none} .brand span.long{display:none} .code-tag{display:none} }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 29 9.5v13L16 30 3 22.5v-13z" fill="#5b8cff"/><path d="M16 2 29 9.5 16 17 3 9.5z" fill="#ffb627"/><path d="M16 17v13l13-7.5v-13z" fill="#2ecf7b"/><circle cx="16" cy="9.5" r="2.4" fill="#0e1122"/></svg>
+      <span class="long">Блоксфера</span><em>3D</em>
+    </div>
+    <input id="projName" aria-label="Название проекта" value="Мой проект">
+    <div class="seg" id="modeSeg" role="group" aria-label="Режим сцены"><button data-m="3d" class="on" title="Объёмный мир, камера вращается">3D</button><button data-m="2d" title="Плоский мир сбоку, как в классических играх">2D</button></div>
+    <div class="runctl">
+      <button class="btn run" id="runBtn" title="Запустить (Ctrl+Enter)">▶ Старт</button>
+      <button class="btn stop" id="stopBtn" title="Остановить (Esc)">■ Стоп</button>
+    </div>
+    <div class="tools">
+      <button class="btn sm wide" id="undoBtn" title="Отменить (Ctrl+Z)">↶</button>
+      <button class="btn sm wide" id="redoBtn" title="Повторить (Ctrl+Shift+Z)">↷</button>
+      <button class="btn sm wide" id="tidyBtn" title="Выстроить скрипты аккуратно">Упорядочить</button>
+      <button class="btn sm" id="helpBtn" title="Как пользоваться">? Помощь</button>
+      <div class="menu">
+        <button class="btn sm" id="projBtn" aria-haspopup="true">Проект ▾</button>
+        <div class="dropdown" id="projMenu" hidden>
+          <button data-act="new">Новый пустой проект</button>
+          <button data-act="ex-jump">Пример: Прыгун 2D<small>персонаж, платформы, шипы, флаг</small></button>
+          <button data-act="ex-coins">Пример: Монетки<small>платформер, физика, копии, счёт</small></button>
+          <button data-act="ex-space">Пример: Солнечная система<small>орбиты, следы, ночь</small></button>
+          <button data-act="ex-music">Пример: Пианино-кубы<small>клавиши, ноты, свечение</small></button>
+          <hr>
+          <button data-act="open">Открыть файл .json…</button>
+          <button data-act="paste">Вставить проект из текста…</button>
+          <button data-act="copy">Скопировать проект в буфер</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="work">
+    <section class="code" id="codeArea">
+      <div id="blocklyDiv"></div>
+      <div class="code-top"><input id="blockSearch" placeholder="Найти блок: прыг, звук…" autocomplete="off" aria-label="Поиск блоков"><div class="code-tag">Скрипты: <b id="curName">—</b></div></div>
+      <div id="emptyHint" hidden><b>Здесь пока пусто</b>Открой раздел «События» слева и перетащи сюда блок «когда нажат ▶ Старт». Потом прицепи под него блоки из других разделов.</div>
+      <div class="zoom">
+        <button id="zIn" title="Крупнее">+</button>
+        <button id="zOut" title="Мельче">−</button>
+        <button id="zFit" title="Показать все скрипты">⌖</button>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="stage" id="stage">
+        <canvas id="view"></canvas>
+        <div id="overlay"></div>
+        <div id="vars"></div>
+        <div id="hud"></div>
+        <div class="stage-tools">
+          <button data-mode="translate" class="on" title="Перетаскивать объект стрелками">Двигать</button>
+          <button data-mode="rotate" title="Вращать объект">Вращать</button>
+          <button data-mode="scale" title="Менять размер">Размер</button>
+          <button id="camReset" title="Вернуть камеру">Камера</button>
+          <button id="fullBtn" title="Во весь экран">⤢</button>
+        </div>
+        <div id="runBadge" hidden>● Игра идёт</div>
+        <form id="askForm" hidden><input id="askInput" autocomplete="off" aria-label="Ответ"><button class="btn sm run" type="submit">OK</button></form>
+      </div>
+
+      <div class="panels">
+        <section class="panel">
+          <div class="panel-h"><h2>Объекты</h2><span class="hint">Перетащи скрипт на объект — он скопируется</span></div>
+          <div class="objlist" id="objList"></div>
+          <div class="addbar" id="addBar"><span class="lbl">Добавить:</span></div>
+        </section>
+        <section class="panel" id="propsPanel">
+          <div class="panel-h"><h2>Свойства</h2>
+            <div style="display:flex;gap:6px"><button class="btn sm" id="dupBtn">Дублировать</button><button class="btn sm danger" id="delBtn">Удалить</button></div>
+          </div>
+          <div class="props">
+            <label class="w3">Имя<input id="pName"></label>
+            <label class="w2">Форма<select id="pShape"></select></label>
+            <label>Цвет<input type="color" id="pColor"></label>
+            <label class="w2">X<input type="number" step="0.5" id="pX"></label>
+            <label class="w2">Y (высота)<input type="number" step="0.5" id="pY"></label>
+            <label class="w2">Z<input type="number" step="0.5" id="pZ"></label>
+            <label class="w3">Поворот, °<input type="number" step="15" id="pR"></label>
+            <label class="w3">Размер, %<input type="number" step="10" id="pS"></label>
+          </div>
+          <div class="props" id="heroProps" hidden>
+            <label class="w2">Кожа<input type="color" id="pSkin"></label>
+            <label class="w2">Штаны<input type="color" id="pPants"></label>
+            <label class="w2">Волосы<input type="color" id="pHair"></label>
+            <label class="w3">Головной убор<select id="pHat"><option value="hair">причёска</option><option value="cap">кепка</option><option value="crown">корона</option><option value="party">колпак</option><option value="none">ничего</option></select></label>
+            <label class="w3">Цвет кофты<input type="color" id="pShirt"></label>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <form class="dlg" id="dlg">
+    <h3 id="dlgTitle"></h3>
+    <p id="dlgText"></p>
+    <input id="dlgInput" autocomplete="off">
+    <textarea id="dlgArea" spellcheck="false"></textarea>
+    <div class="dlg-actions"><button type="button" class="btn" id="dlgCancel">Отмена</button><button type="submit" class="btn run" id="dlgOk">OK</button></div>
+  </form>
+</div>
+<input type="file" id="fileIn" accept=".json,application/json" hidden>
+<div id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/blockly@10.4.3/blockly_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@10.4.3/blocks_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@10.4.3/msg/ru.js"></script>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+const $ = s => document.querySelector(s);
+const DEG = Math.PI / 180;
+const toNum = v => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+const uid = () => 'o' + Math.random().toString(36).slice(2, 9);
+const fmt = v => typeof v === 'number' ? (Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100)) : Array.isArray(v) ? v.map(fmt).join(', ') : (v == null ? '' : String(v));
+
+/* ---------------- UI helpers ---------------- */
+function toast(msg, err = false) {
+  const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg;
+  $('#toasts').append(t); setTimeout(() => t.remove(), err ? 5200 : 2600);
+}
+function dialog({ title = '', text = '', input = null, area = null, ok = 'OK', cancel = 'Отмена' }) {
+  return new Promise(res => {
+    const m = $('#modal'), f = $('#dlg'), inp = $('#dlgInput'), ta = $('#dlgArea');
+    $('#dlgTitle').textContent = title; $('#dlgText').textContent = text; $('#dlgText').hidden = !text;
+    inp.hidden = input === null; ta.hidden = area === null;
+    inp.value = input ?? ''; ta.value = area ?? '';
+    $('#dlgOk').textContent = ok; $('#dlgCancel').hidden = cancel === null; $('#dlgCancel').textContent = cancel || '';
+    m.hidden = false;
+    setTimeout(() => (input !== null ? inp : area !== null ? ta : $('#dlgOk')).focus(), 20);
+    const done = v => { m.hidden = true; f.onsubmit = null; $('#dlgCancel').onclick = null; res(v); };
+    f.onsubmit = e => { e.preventDefault(); done(input !== null ? inp.value : area !== null ? ta.value : true); };
+    $('#dlgCancel').onclick = () => done(null);
+  });
+}
+Blockly.dialog.setPrompt((msg, def, cb) => dialog({ title: msg, input: def || '' }).then(v => cb(v)));
+Blockly.dialog.setConfirm((msg, cb) => dialog({ title: 'Подтвердите', text: msg, ok: 'Да' }).then(v => cb(!!v)));
+Blockly.dialog.setAlert((msg, cb) => dialog({ title: msg, cancel: null }).then(() => cb && cb()));
+
+/* ---------------- shapes ---------------- */
+const SHAPES = {
+  hero: ['Персонаж', '☺'], cube: ['Куб', '■'], sphere: ['Шар', '●'], cylinder: ['Цилиндр', '▮'], cone: ['Конус', '▲'],
+  pyramid: ['Пирамида', '◭'], torus: ['Бублик', '◎'], capsule: ['Капсула', '⬮'], platform: ['Платформа', '▬'], coin: ['Монета', '◉'],
+};
+const GEO = {};
+function geo(shape) {
+  if (GEO[shape]) return GEO[shape];
+  let g;
+  switch (shape) {
+    case 'sphere': g = new THREE.SphereGeometry(0.5, 40, 20); break;
+    case 'cylinder': g = new THREE.CylinderGeometry(0.5, 0.5, 1, 36); break;
+    case 'cone': g = new THREE.ConeGeometry(0.5, 1, 36); break;
+    case 'pyramid': g = new THREE.ConeGeometry(0.62, 1, 4); g.rotateY(Math.PI / 4); break;
+    case 'torus': g = new THREE.TorusGeometry(0.38, 0.14, 18, 48); break;
+    case 'capsule': g = new THREE.CapsuleGeometry(0.35, 0.6, 8, 20); break;
+    case 'platform': g = new THREE.BoxGeometry(3, 0.25, 3); break;
+    case 'coin': g = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 36); g.rotateX(Math.PI / 2); break;
+    case 'hero': g = new THREE.CapsuleGeometry(0.3, 0.35, 8, 20); break;
+    default: g = new THREE.BoxGeometry(1, 1, 1);
+  }
+  return (GEO[shape] = g);
+}
+
+/* ---------------- character ---------------- */
+const HG = {
+  head: new THREE.SphereGeometry(0.27, 28, 18), eye: new THREE.SphereGeometry(0.045, 12, 8), mouth: new THREE.BoxGeometry(0.12, 0.03, 0.02),
+  leg: new THREE.BoxGeometry(0.17, 0.42, 0.18).translate(0, -0.21, 0), arm: new THREE.BoxGeometry(0.13, 0.42, 0.13).translate(0, -0.2, 0),
+  hair: new THREE.SphereGeometry(0.29, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), capTop: new THREE.SphereGeometry(0.29, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
+  brim: new THREE.CylinderGeometry(0.2, 0.2, 0.03, 24), crown: new THREE.CylinderGeometry(0.2, 0.24, 0.18, 8, 1, true), party: new THREE.ConeGeometry(0.17, 0.42, 20),
+};
+const HERO_LOOK = { skin: '#f1c19a', pants: '#2f3b5c', hair: '#4a2c17', hat: 'hair' };
+const part = (m, n) => m.children.find(c => c.userData.part === n);
+function heroParts(m, look) {
+  for (const c of [...m.children]) if (c.userData.part) { m.remove(c); if (!c.userData.shared) c.material.dispose(); }
+  if (m.userData.shape !== 'hero') return;
+  const L = { ...HERO_LOOK, ...(look || {}) };
+  const add = (g, color, x, y, z, name, extra) => {
+    const p = new THREE.Mesh(g, color ? new THREE.MeshStandardMaterial({ color, roughness: 0.55, ...(extra || {}) }) : m.material);
+    p.position.set(x, y, z); p.castShadow = true; p.userData.part = name; if (!color) p.userData.shared = true; m.add(p); return p;
+  };
+  add(HG.head, L.skin, 0, 0.6, 0, 'head');
+  add(HG.eye, '#15151f', -0.09, 0.64, -0.245, 'eye'); add(HG.eye, '#15151f', 0.09, 0.64, -0.245, 'eye');
+  add(HG.mouth, '#8a3030', 0, 0.5, -0.262, 'mouth');
+  add(HG.leg, L.pants, -0.11, -0.3, 0, 'legL'); add(HG.leg, L.pants, 0.11, -0.3, 0, 'legR');
+  add(HG.arm, null, -0.37, 0.2, 0, 'armL'); add(HG.arm, null, 0.37, 0.2, 0, 'armR');
+  if (L.hat === 'hair') add(HG.hair, L.hair, 0, 0.63, 0.015, 'hat');
+  if (L.hat === 'cap') { add(HG.capTop, '#e5484d', 0, 0.64, 0.01, 'hat'); add(HG.brim, '#e5484d', 0, 0.66, -0.2, 'hat'); }
+  if (L.hat === 'crown') add(HG.crown, '#ffcf33', 0, 0.9, 0, 'hat', { metalness: 0.6, roughness: 0.3, side: THREE.DoubleSide });
+  if (L.hat === 'party') add(HG.party, '#ff5aa5', 0, 1.0, 0, 'hat');
+}
+
+/* ---------------- three.js scene ---------------- */
+const canvas = $('#view'), stageEl = $('#stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene();
+const persp = new THREE.PerspectiveCamera(55, 16 / 10, 0.1, 400);
+const ortho = new THREE.OrthographicCamera(-10, 10, 7, -7, 0.1, 400);
+const VIEW2D = 11;
+const EDIT_CAM2D = { pos: new THREE.Vector3(0, 4, 40), target: new THREE.Vector3(0, 4, 0) };
+let camera = persp;
+const EDIT_CAM = { pos: new THREE.Vector3(9, 8, 12), target: new THREE.Vector3(0, 1, 0) };
+camera.position.copy(EDIT_CAM.pos);
+const orbit = new OrbitControls(camera, canvas); orbit.target.copy(EDIT_CAM.target); orbit.enableDamping = true; orbit.maxPolarAngle = Math.PI * 0.495;
+const hemi = new THREE.HemisphereLight(0xdff1ff, 0x4a6a3a, 1.1); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 2.3); sun.position.set(10, 18, 8); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, far: 80 }); sun.shadow.bias = -0.0005;
+scene.add(sun);
+const floorGroup = new THREE.Group(); scene.add(floorGroup);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x74c06a, roughness: 0.95 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; floorGroup.add(floor);
+const grid = new THREE.GridHelper(60, 60, 0x2f6b2a, 0x2f6b2a); grid.position.y = 0.002; grid.material.transparent = true; grid.material.opacity = 0.22; floorGroup.add(grid);
+const ground2d = new THREE.Mesh(new THREE.BoxGeometry(400, 8, 8), new THREE.MeshStandardMaterial({ color: 0x6fb35f, roughness: 0.95 }));
+ground2d.position.y = -4; ground2d.receiveShadow = true; ground2d.visible = false; floorGroup.add(ground2d);
+const weather = (() => {
+  const n = 2500, p = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) p.set([Math.random() * 40 - 20, Math.random() * 20, Math.random() * 40 - 20], i * 3);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.14, transparent: true, opacity: 0.9, depthWrite: false }));
+  pts.visible = false; pts.frustumCulled = false; scene.add(pts); return { pts, kind: 'none' };
+})();
+function setWeather(k) {
+  weather.kind = k; weather.pts.visible = k !== 'none';
+  weather.pts.material.color.set(k === 'rain' ? '#a9c8ff' : k === 'leaves' ? '#ff9f43' : '#ffffff');
+  weather.pts.material.size = k === 'rain' ? 0.09 : k === 'leaves' ? 0.24 : 0.14;
+}
+const stars = (() => {
+  const n = 900, p = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const v = new THREE.Vector3().randomDirection(); v.y = Math.abs(v.y); v.multiplyScalar(150); p.set([v.x, v.y, v.z], i * 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const s = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.8, sizeAttenuation: true })); s.visible = false; scene.add(s); return s;
+})();
+const trails = new THREE.Group(); scene.add(trails);
+const tc = new TransformControls(camera, canvas); tc.setSize(0.85);
+tc.addEventListener('dragging-changed', e => { orbit.enabled = !e.value; });
+tc.addEventListener('objectChange', () => { const o = curObj(); if (!o) return; readMeshIntoObj(o); fillProps(); scheduleSave(); });
+scene.add(tc);
+
+const WORLD_TIMES = {
+  day: { sky: '#9fd3ff', hemi: 1.1, hemiC: '#dff1ff', sun: 2.3, sunC: '#ffffff', stars: false },
+  sunset: { sky: '#f3a06d', hemi: 0.75, hemiC: '#ffd7b0', sun: 1.5, sunC: '#ffb47a', stars: false },
+  night: { sky: '#0b1030', hemi: 0.28, hemiC: '#8fa6ff', sun: 0.4, sunC: '#9fb3ff', stars: true },
+};
+const world = { sky: '#9fd3ff', fog: false };
+function setSky(c) { world.sky = c; scene.background = new THREE.Color(c); if (scene.fog) scene.fog.color.set(c); }
+function setTime(t) { const w = WORLD_TIMES[t] || WORLD_TIMES.day; setSky(w.sky); hemi.intensity = w.hemi; hemi.color.set(w.hemiC); sun.intensity = w.sun; sun.color.set(w.sunC); stars.visible = w.stars; }
+function setFog(on) { world.fog = on; scene.fog = on ? new THREE.Fog(world.sky, 12, 55) : null; }
+function resetWorld() { setTime('day'); setFog(false); floorGroup.visible = true; setWeather('none'); }
+resetWorld();
+
+function resize() {
+  const r = stageEl.getBoundingClientRect(); const w = Math.max(1, r.width), h = Math.max(1, r.height);
+  renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix();
+  Object.assign(ortho, { left: -VIEW2D * w / h / 2, right: VIEW2D * w / h / 2, top: VIEW2D / 2, bottom: -VIEW2D / 2 }); ortho.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stageEl);
+
+/* ---------------- project model ---------------- */
+let project = null;          // {name, objects:[], vars:[], selected}
+const meshes = new Map();    // obj.id -> mesh
+let currentId = null;
+const curObj = () => project.objects.find(o => o.id === currentId);
+const objByName = n => project.objects.find(o => o.name === n);
+
+function makeMesh(o) {
+  const m = new THREE.Mesh(geo(o.shape), new THREE.MeshStandardMaterial({ color: o.color, roughness: 0.5, metalness: 0.05 }));
+  m.castShadow = m.receiveShadow = true; m.userData.objId = o.id; applyObj(m, o); scene.add(m); return m;
+}
+function applyObj(m, o) {
+  m.userData.shape = o.shape; m.geometry = geo(o.shape);
+  const mat = m.material; mat.color.set(o.color); mat.emissive.set(0); mat.opacity = 1; mat.transparent = false; mat.wireframe = false;
+  mat.metalness = o.shape === 'coin' ? 0.55 : 0.05; mat.roughness = o.shape === 'coin' ? 0.3 : 0.5;
+  m.position.fromArray(o.pos); m.rotation.order = is2D() ? 'ZYX' : 'XYZ';
+  m.rotation.set(o.rot[0] * DEG, o.rot[1] * DEG, o.rot[2] * DEG); m.scale.fromArray(o.scale); m.visible = true;
+  if (is2D() && o.shape === 'hero') m.rotation.y = -Math.PI / 2;
+  heroParts(m, o.look);
+}
+const is2D = () => project?.mode === '2d';
+function resetCam() {
+  const c = is2D() ? EDIT_CAM2D : EDIT_CAM; camera.position.copy(c.pos); orbit.target.copy(c.target);
+  ortho.zoom = 1; ortho.updateProjectionMatrix(); camera.lookAt(orbit.target); orbit.update();
+}
+function setMode(m) {
+  if (RT.running) stopGame();
+  project.mode = m === '2d' ? '2d' : '3d';
+  camera = is2D() ? ortho : persp; orbit.object = camera; tc.camera = camera;
+  orbit.enableRotate = !is2D(); tc.showZ = !is2D();
+  floor.visible = grid.visible = !is2D(); ground2d.visible = is2D();
+  for (const o of project.objects) applyObj(meshes.get(o.id), o);
+  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === project.mode));
+  resetCam(); resize(); fillProps();
+}
+function readMeshIntoObj(o) {
+  const m = meshes.get(o.id); const r = v => Math.round(v * 100) / 100;
+  if (is2D() && o.shape === 'hero') { o.pos = m.position.toArray().map(r); o.rot = [o.rot[0], o.rot[1], r(m.rotation.z / DEG)]; o.scale = m.scale.toArray().map(r); return; }
+  o.pos = m.position.toArray().map(r); o.rot = [m.rotation.x, m.rotation.y, m.rotation.z].map(a => r(a / DEG)); o.scale = m.scale.toArray().map(r);
+}
+function uniqueName(base) { let n = base, i = 2; while (objByName(n)) n = base + i++; return n; }
+function newObj(shape, extra = {}) {
+  const rnd = () => Math.round((Math.random() * 6 - 3) * 2) / 2;
+  return Object.assign({ id: uid(), name: uniqueName(SHAPES[shape][0]), shape, color: shape === 'hero' ? '#3c7cf0' : '#' + new THREE.Color().setHSL(Math.random(), 0.65, 0.58).getHexString(),
+    pos: [rnd(), shape === 'platform' ? 0.13 : shape === 'hero' ? 0.73 : 0.5, is2D() ? 0 : rnd()], rot: [0, 0, 0], scale: [1, 1, 1], blocks: null,
+    ...(shape === 'hero' ? { look: { ...HERO_LOOK } } : {}) }, extra);
+}
+
+/* ---------------- Blockly: blocks ---------------- */
+const C = { ev: '#E6A817', ct: '#EE7A22', mv: '#3C7CF0', lk: '#8F5BEA', ph: '#D93838', sn: '#1FAFC8', sd: '#DB4AA6', wd: '#2E9E5B', op: '#6DB33F', ls: '#B8733A', vr: '#F2647A', fn: '#6C6FF0' };
+const AXES = [['x', 'x'], ['y', 'y'], ['z', 'z']];
+const ROT_AXES = [['↻ вокруг Y', 'y'], ['вокруг X', 'x'], ['вокруг Z', 'z']];
+const ONOFF = [['вкл', 'on'], ['выкл', 'off']];
+const KEYS = [['пробел', 'space'], ['↑', 'ArrowUp'], ['↓', 'ArrowDown'], ['←', 'ArrowLeft'], ['→', 'ArrowRight'], ['Enter', 'enter'], ['любая', 'any'],
+  ...'abcdefghijklmnopqrstuvwxyz'.split('').map(c => [c.toUpperCase(), c]), ...'0123456789'.split('').map(c => [c, c])];
+const objOpts = (pre = [], self = null) => function () {
+  const out = pre.slice();
+  for (const o of project?.objects || []) if (o.id !== self?.()) out.push([o.name, o.name]);
+  return out.length ? out : [['—', '__none']];
+};
+const otherObjs = (pre) => objOpts(pre, () => currentId);
+const SHAPE_OPTS = Object.entries(SHAPES).map(([k, v]) => [v[0], k]);
+const FX = [['прыжок', 'jump'], ['монетка', 'coin'], ['взрыв', 'boom'], ['лазер', 'laser'], ['победа', 'win'], ['ошибка', 'error'], ['хлопок', 'pop']];
+
+const V = n => ({ type: 'input_value', name: n });
+const DD = (n, o) => ({ type: 'field_dropdown', name: n, options: o });
+const defs = [];
+function def(type, msg, args, kind, c, tip, extra = {}) {
+  const o = { type, message0: msg, args0: args, colour: c, tooltip: tip || '', inputsInline: true, ...extra };
+  if (kind === 's') { o.previousStatement = null; o.nextStatement = null; }
+  if (kind === 'h') o.nextStatement = null;
+  if (kind === 'c') o.previousStatement = null;
+  if (kind === 'n') o.output = 'Number';
+  if (kind === 'b') o.output = 'Boolean';
+  if (kind === 'a') o.output = null;
+  defs.push(o);
+}
+// events
+def('ev_start', 'когда нажат ▶ Старт', [], 'h', C.ev, 'Скрипт запускается при нажатии кнопки «Старт».');
+def('ev_key', 'когда нажата клавиша %1', [DD('KEY', KEYS)], 'h', C.ev);
+def('ev_click', 'когда по мне кликнули', [], 'h', C.ev, 'Срабатывает, когда в игре кликают мышкой по этому объекту.');
+def('ev_touch', 'когда я коснулся %1', [DD('OBJ', otherObjs([['любого объекта', '__any'], ['земли', '__ground']]))], 'h', C.ev, 'Срабатывает в момент касания.');
+def('ev_msg', 'когда получено сообщение %1', [{ type: 'field_input', name: 'MSG', text: 'сигнал' }], 'h', C.ev);
+def('ev_broadcast', 'отправить всем %1', [{ type: 'field_input', name: 'MSG', text: 'сигнал' }], 's', C.ev);
+def('ev_broadcastwait', 'отправить всем %1 и ждать', [{ type: 'field_input', name: 'MSG', text: 'сигнал' }], 's', C.ev);
+def('ev_timer', 'каждые %1 сек', [{ type: 'field_number', name: 'SEC', value: 1, min: 0.05 }], 'h', C.ev, 'Повторяется по таймеру, пока игра идёт.');
+def('ev_clone', 'когда я появился как копия', [], 'h', C.ev);
+// control
+def('ct_wait', 'ждать %1 сек', [V('N')], 's', C.ct);
+def('ct_forever', 'повторять всегда %1 %2', [{ type: 'input_dummy' }, { type: 'input_statement', name: 'DO' }], 'c', C.ct);
+def('ct_waituntil', 'ждать, пока не %1', [V('COND')], 's', C.ct);
+def('ct_stop', 'стоп %1', [DD('W', [['всё', 'all'], ['этот скрипт', 'this']])], 'c', C.ct);
+def('ct_clone', 'создать копию %1', [DD('OBJ', objOpts([['себя', '__self']]))], 's', C.ct);
+def('ct_delclone', 'удалить эту копию', [], 'c', C.ct);
+// motion
+def('mv_move', 'пройти вперёд на %1', [V('N')], 's', C.mv, 'Движение туда, куда смотрит объект. 1 = размер кубика.');
+def('mv_rotate', 'повернуть %1 на %2 °', [DD('AX', ROT_AXES), V('N')], 's', C.mv);
+def('mv_moveaxis', 'сдвинуть по %1 на %2', [DD('AX', AXES), V('N')], 's', C.mv);
+def('mv_setpos', 'перейти в x %1 y %2 z %3', [V('X'), V('Y'), V('Z')], 's', C.mv);
+def('mv_setaxis', 'установить %1 в %2', [DD('AX', AXES), V('N')], 's', C.mv);
+def('mv_setrot', 'установить поворот %1 в %2 °', [DD('AX', ROT_AXES), V('N')], 's', C.mv);
+def('mv_glide', 'плыть %1 сек в x %2 y %3 z %4', [V('T'), V('X'), V('Y'), V('Z')], 's', C.mv);
+def('mv_goto', 'перейти к %1', [DD('OBJ', otherObjs([['случайному месту', '__random'], ['указателю мыши', '__mouse']]))], 's', C.mv);
+def('mv_lookat', 'повернуться к %1', [DD('OBJ', otherObjs([['указателю мыши', '__mouse'], ['камере', '__camera']]))], 's', C.mv);
+def('mv_bounce', 'если у края мира, оттолкнуться', [], 's', C.mv);
+def('mv_pos', 'позиция %1', [DD('AX', AXES)], 'n', C.mv);
+def('mv_rot', 'поворот %1', [DD('AX', ROT_AXES)], 'n', C.mv);
+// looks
+def('lk_say', 'сказать %1', [V('TEXT')], 's', C.lk);
+def('lk_sayfor', 'сказать %1 на %2 сек', [V('TEXT'), V('N')], 's', C.lk);
+def('lk_color', 'цвет %1', [{ type: 'field_colour', name: 'C', colour: '#ff5a5f' }], 's', C.lk);
+def('lk_colorrand', 'случайный цвет', [], 's', C.lk);
+def('lk_size', 'размер %1 %', [V('N')], 's', C.lk);
+def('lk_changesize', 'изменить размер на %1 %', [V('N')], 's', C.lk);
+def('lk_stretch', 'растянуть x %1 y %2 z %3 %', [V('X'), V('Y'), V('Z')], 's', C.lk);
+def('lk_show', 'показаться', [], 's', C.lk);
+def('lk_hide', 'спрятаться', [], 's', C.lk);
+def('lk_shape', 'стать формой %1', [DD('S', SHAPE_OPTS)], 's', C.lk);
+def('lk_opacity', 'непрозрачность %1 %', [V('N')], 's', C.lk);
+def('lk_glow', 'свечение %1', [DD('ON', ONOFF)], 's', C.lk);
+def('lk_wire', 'каркас %1', [DD('ON', ONOFF)], 's', C.lk);
+def('lk_sizer', 'размер', [], 'n', C.lk);
+def('lk_hat', 'надеть %1', [DD('H', [['кепку', 'cap'], ['корону', 'crown'], ['колпак', 'party'], ['причёску', 'hair'], ['ничего', 'none']])], 's', C.lk, 'Работает у персонажа.');
+def('lk_wave', 'помахать рукой', [], 's', C.lk, 'Персонаж машет рукой.');
+// physics
+def('ph_gravity', 'гравитация для меня %1', [DD('ON', ONOFF)], 's', C.ph, 'Объект падает, стоит на полу и на других объектах.');
+def('ph_jump', 'прыгнуть с силой %1', [V('N')], 's', C.ph);
+def('ph_push', 'толкнуть вперёд с силой %1', [V('N')], 's', C.ph);
+def('ph_vel', 'скорость x %1 y %2 z %3', [V('X'), V('Y'), V('Z')], 's', C.ph);
+def('ph_bounce', 'упругость %1 %', [V('N')], 's', C.ph, '0 — не подпрыгивает, 100 — мячик.');
+def('ph_solid', 'сквозь меня можно проходить %1', [DD('ON', [['да', 'on'], ['нет', 'off']])], 's', C.ph);
+def('ph_onground', 'стою на опоре?', [], 'b', C.ph);
+def('ph_worldg', 'сила гравитации мира %1', [V('N')], 's', C.ph);
+// sensing
+def('sn_key', 'клавиша %1 нажата?', [DD('KEY', KEYS)], 'b', C.sn);
+def('sn_touch', 'касаюсь %1?', [DD('OBJ', otherObjs([['любого объекта', '__any'], ['земли', '__ground']]))], 'b', C.sn);
+def('sn_dist', 'расстояние до %1', [DD('OBJ', otherObjs([['указателя мыши', '__mouse'], ['камеры', '__camera']]))], 'n', C.sn);
+def('sn_mouse', 'мышь нажата?', [], 'b', C.sn);
+def('sn_mxy', 'указатель мыши %1', [DD('AX', AXES)], 'n', C.sn, 'Где указатель мыши на земле (в 3D) или на сцене (в 2D).');
+def('sn_ask', 'спросить %1 и ждать', [V('TEXT')], 's', C.sn);
+def('sn_answer', 'ответ', [], 'a', C.sn);
+def('sn_timer', 'таймер', [], 'n', C.sn);
+def('sn_resettimer', 'сбросить таймер', [], 's', C.sn);
+def('sn_name', 'моё имя', [], 'a', C.sn);
+def('sn_isclone', 'я копия?', [], 'b', C.sn);
+// sound
+def('sd_fx', 'звук %1', [DD('FX', FX)], 's', C.sd);
+def('sd_note', 'сыграть ноту %1 на %2 сек', [V('N'), V('T')], 's', C.sd, 'Нота по номеру MIDI: 60 — «до» первой октавы.');
+def('sd_instr', 'инструмент %1', [DD('W', [['пианино', 'triangle'], ['флейта', 'sine'], ['8-бит', 'square'], ['синтезатор', 'sawtooth']])], 's', C.sd);
+def('sd_melody', 'сыграть мелодию %1', [DD('M', [['весёлую', 'happy'], ['победную', 'win'], ['грустную', 'sad'], ['загадочную', 'mystery'], ['танцевальную', 'dance']])], 's', C.sd);
+def('sd_speak', 'произнести %1', [V('TEXT')], 's', C.sd, 'Голос браузера читает текст вслух.');
+def('sd_volume', 'громкость %1 %', [V('N')], 's', C.sd);
+// world
+def('wd_time', 'время суток %1', [DD('T', [['день', 'day'], ['закат', 'sunset'], ['ночь', 'night']])], 's', C.wd);
+def('wd_sky', 'цвет неба %1', [{ type: 'field_colour', name: 'C', colour: '#9fd3ff' }], 's', C.wd);
+def('wd_fog', 'туман %1', [DD('ON', ONOFF)], 's', C.wd);
+def('wd_floor', 'пол %1', [DD('ON', ONOFF)], 's', C.wd);
+def('wd_follow', 'камера следит за мной, дистанция %1', [V('N')], 's', C.wd);
+def('wd_view', 'вид камеры %1', [DD('V', [['сзади', 'back'], ['от первого лица', 'first'], ['сверху', 'top'], ['сбоку', 'side']])], 's', C.wd, 'Камера следит за этим объектом с выбранной стороны.');
+def('wd_weather', 'погода %1', [DD('W', [['ясно', 'none'], ['снег', 'snow'], ['дождь', 'rain'], ['листопад', 'leaves']])], 's', C.wd);
+def('wd_campos', 'камера в x %1 y %2 z %3', [V('X'), V('Y'), V('Z')], 's', C.wd);
+def('wd_camfree', 'свободная камера', [], 's', C.wd);
+def('wd_shake', 'тряхнуть камеру', [], 's', C.wd);
+def('wd_boom', 'взрыв частиц %1', [{ type: 'field_colour', name: 'C', colour: '#ffc531' }], 's', C.wd);
+def('wd_hud', 'надпись на экране %1', [V('TEXT')], 's', C.wd);
+def('wd_trail', 'оставлять след %1', [DD('ON', ONOFF)], 's', C.wd, 'Объект рисует линию там, где движется.');
+def('wd_cleartrails', 'стереть все следы', [], 's', C.wd);
+Blockly.common.defineBlocksWithJsonArray(defs);
+const HATS = { ev_start: null, ev_key: 'KEY', ev_click: null, ev_touch: 'OBJ', ev_msg: 'MSG', ev_timer: 'SEC', ev_clone: null };
+
+/* toolbox */
+const sh = v => typeof v === 'number' ? { shadow: { type: 'math_number', fields: { NUM: v } } } : { shadow: { type: 'text', fields: { TEXT: v } } };
+const tb = (type, inputs, fields, extraState) => { const o = { kind: 'block', type }; if (inputs) { o.inputs = {}; for (const k in inputs) o.inputs[k] = sh(inputs[k]); } if (fields) o.fields = fields; if (extraState) o.extraState = extraState; return o; };
+const cat = (name, colour, contents) => ({ kind: 'category', name, colour, contents });
+const toolbox = { kind: 'categoryToolbox', contents: [
+  cat('События', C.ev, [tb('ev_start'), tb('ev_key'), tb('ev_click'), tb('ev_touch'), tb('ev_msg'), tb('ev_broadcast'), tb('ev_broadcastwait'), tb('ev_timer'), tb('ev_clone')]),
+  cat('Управление', C.ct, [tb('ct_wait', { N: 1 }), tb('controls_repeat_ext', { TIMES: 10 }), tb('ct_forever'), tb('controls_if'), tb('controls_if', null, null, { hasElse: true }),
+    tb('ct_waituntil'), tb('controls_whileUntil'), tb('controls_for', { FROM: 1, TO: 10, BY: 1 }), tb('controls_flow_statements'), tb('ct_stop'), tb('ct_clone'), tb('ct_delclone')]),
+  cat('Движение', C.mv, [tb('mv_move', { N: 1 }), tb('mv_rotate', { N: 15 }), tb('mv_moveaxis', { N: 1 }), tb('mv_setpos', { X: 0, Y: 0.5, Z: 0 }), tb('mv_setaxis', { N: 1 }),
+    tb('mv_setrot', { N: 0 }), tb('mv_glide', { T: 1, X: 0, Y: 0.5, Z: 0 }), tb('mv_goto'), tb('mv_lookat'), tb('mv_bounce'), tb('mv_pos'), tb('mv_rot')]),
+  cat('Внешность', C.lk, [tb('lk_say', { TEXT: 'Привет!' }), tb('lk_sayfor', { TEXT: 'Привет!', N: 2 }), tb('lk_color'), tb('lk_colorrand'), tb('lk_size', { N: 100 }), tb('lk_changesize', { N: 10 }),
+    tb('lk_stretch', { X: 100, Y: 200, Z: 100 }), tb('lk_show'), tb('lk_hide'), tb('lk_shape'), tb('lk_opacity', { N: 50 }), tb('lk_glow'), tb('lk_wire'), tb('lk_sizer'), tb('lk_hat'), tb('lk_wave')]),
+  cat('Физика', C.ph, [tb('ph_gravity'), tb('ph_jump', { N: 8 }), tb('ph_push', { N: 6 }), tb('ph_vel', { X: 0, Y: 0, Z: 0 }), tb('ph_bounce', { N: 50 }), tb('ph_solid'), tb('ph_onground'), tb('ph_worldg', { N: 20 })]),
+  cat('Сенсоры', C.sn, [tb('sn_key'), tb('sn_touch'), tb('sn_dist'), tb('sn_mouse'), tb('sn_mxy'), tb('sn_ask', { TEXT: 'Как тебя зовут?' }), tb('sn_answer'), tb('sn_timer'), tb('sn_resettimer'), tb('sn_name'), tb('sn_isclone')]),
+  cat('Звук', C.sd, [tb('sd_fx'), tb('sd_melody'), tb('sd_note', { N: 60, T: 0.4 }), tb('sd_instr'), tb('sd_speak', { TEXT: 'Привет, мир!' }), tb('sd_volume', { N: 80 })]),
+  cat('Мир и камера', C.wd, [tb('wd_time'), tb('wd_sky'), tb('wd_fog'), tb('wd_floor'), tb('wd_follow', { N: 7 }), tb('wd_view'), tb('wd_weather'), tb('wd_campos', { X: 10, Y: 8, Z: 12 }), tb('wd_camfree'), tb('wd_shake'), tb('wd_boom'),
+    tb('wd_hud', { TEXT: 'Счёт: 0' }), tb('wd_trail'), tb('wd_cleartrails')]),
+  cat('Операторы', C.op, [tb('math_arithmetic', { A: 1, B: 1 }), tb('math_random_int', { FROM: 1, TO: 10 }), tb('logic_compare', { A: 0, B: 0 }), tb('logic_operation'), tb('logic_negate'), tb('logic_boolean'),
+    tb('math_modulo', { DIVIDEND: 10, DIVISOR: 3 }), tb('math_round', { NUM: 3.7 }), tb('math_single', { NUM: 9 }), tb('math_trig', { NUM: 45 }), tb('math_number'),
+    tb('text', null, { TEXT: 'текст' }), tb('text_join', { ADD0: 'Счёт: ', ADD1: '0' }, null, { itemCount: 2 }), tb('text_length', { VALUE: 'абв' })]),
+  cat('Списки', C.ls, [tb('lists_create_with', null, null, { itemCount: 0 }), tb('lists_create_with', { ADD0: 1, ADD1: 2, ADD2: 3 }, null, { itemCount: 3 }), tb('lists_length'), tb('lists_getIndex', { AT: 1 }), tb('lists_setIndex', { AT: 1 })]),
+  { kind: 'sep' },
+  { kind: 'category', name: 'Переменные', colour: C.vr, custom: 'VARIABLE' },
+  { kind: 'category', name: 'Функции', colour: C.fn, custom: 'PROCEDURE' },
+] };
+
+const theme = Blockly.Theme.defineTheme('blocksphere', {
+  base: Blockly.Themes.Classic, startHats: true,
+  fontStyle: { family: 'Manrope, system-ui, sans-serif', weight: '700', size: 11 },
+  componentStyles: { workspaceBackgroundColour: '#12162a', toolboxBackgroundColour: '#0c0f1e', toolboxForegroundColour: '#dfe3f5', flyoutBackgroundColour: '#181d36',
+    flyoutForegroundColour: '#cfd5ee', flyoutOpacity: 0.97, scrollbarColour: '#3a4170', scrollbarOpacity: 0.7, insertionMarkerColour: '#ffffff', insertionMarkerOpacity: 0.3, cursorColour: '#ffb627', selectedGlowColour: '#ffb627' },
+  blockStyles: { logic_blocks: { colourPrimary: C.op }, math_blocks: { colourPrimary: C.op }, text_blocks: { colourPrimary: C.op }, loop_blocks: { colourPrimary: C.ct },
+    list_blocks: { colourPrimary: C.ls }, variable_blocks: { colourPrimary: C.vr }, variable_dynamic_blocks: { colourPrimary: C.vr }, procedure_blocks: { colourPrimary: C.fn }, colour_blocks: { colourPrimary: C.lk } },
+});
+const ws = Blockly.inject('blocklyDiv', {
+  toolbox, theme, renderer: 'zelos', media: 'https://cdn.jsdelivr.net/npm/blockly@10.4.3/media/', sounds: false, trashcan: false,
+  grid: { spacing: 28, length: 2, colour: '#262c4d', snap: true },
+  zoom: { controls: false, wheel: true, startScale: 0.72, maxScale: 2, minScale: 0.3, scaleSpeed: 1.15 },
+  move: { scrollbars: true, drag: true, wheel: false },
+});
+new ResizeObserver(() => Blockly.svgResize(ws)).observe($('#codeArea'));
+$('#zIn').onclick = () => ws.zoomCenter(1);
+$('#zOut').onclick = () => ws.zoomCenter(-1);
+$('#zFit').onclick = () => { ws.zoomToFit(); if (ws.scale > 0.9) ws.setScale(0.9); ws.scrollCenter(); };
+$('#undoBtn').onclick = () => ws.undo(false);
+$('#redoBtn').onclick = () => ws.undo(true);
+$('#tidyBtn').onclick = () => ws.cleanUp();
+
+let loadingWs = false;
+function saveWs() {
+  const o = curObj(); if (!o) return;
+  o.blocks = Blockly.serialization.workspaces.save(ws);
+  for (const v of ws.getAllVariables()) if (!project.vars.includes(v.name)) project.vars.push(v.name);
+}
+function loadWs(o) {
+  loadingWs = true;
+  try {
+    ws.clear();
+    if (o?.blocks) Blockly.serialization.workspaces.load(o.blocks, ws);
+    for (const n of project.vars) if (!ws.getVariable(n)) ws.createVariable(n);
+    const tops = ws.getTopBlocks(false).map(b => b.getBoundingRectangle());
+    if (tops.some((r, i) => tops.some((q, j) => j > i && r.left < q.right && q.left < r.right && r.top < q.bottom && q.top < r.bottom))) ws.cleanUp();
+    ws.clearUndo();
+  } catch (e) { console.error(e); toast('Не удалось загрузить скрипты: ' + e.message, true); }
+  loadingWs = false;
+  ws.scroll(40, 40);
+}
+ws.addChangeListener(e => {
+  if (loadingWs || e.isUiEvent) return;
+  updateEmpty();
+  if (e.type === Blockly.Events.VAR_DELETE) project.vars = project.vars.filter(n => n !== e.varName);
+  if (e.type === Blockly.Events.VAR_RENAME) project.vars = project.vars.map(n => n === e.oldName ? e.newName : n);
+  scheduleSave();
+});
+
+/* drag a script onto another object to copy it */
+const ptr = { x: 0, y: 0 }; let dragInfo = null;
+document.addEventListener('pointermove', e => {
+  ptr.x = e.clientX; ptr.y = e.clientY;
+  if (dragInfo) document.querySelectorAll('.obj').forEach(el => el.classList.toggle('drop', el.dataset.id !== currentId && inRect(el)));
+}, true);
+const inRect = el => { const r = el.getBoundingClientRect(); return ptr.x >= r.left && ptr.x <= r.right && ptr.y >= r.top && ptr.y <= r.bottom; };
+ws.addChangeListener(e => {
+  if (e.type !== Blockly.Events.BLOCK_DRAG) return;
+  const b = ws.getBlockById(e.blockId); if (!b) return;
+  if (e.isStart) { dragInfo = { xy: b.getRelativeToSurfaceXY() }; return; }
+  const info = dragInfo; dragInfo = null;
+  const target = [...document.querySelectorAll('.obj')].find(el => el.dataset.id !== currentId && inRect(el));
+  document.querySelectorAll('.obj.drop').forEach(el => el.classList.remove('drop'));
+  if (!target || !info) return;
+  const to = project.objects.find(o => o.id === target.dataset.id); if (!to) return;
+  const json = Blockly.serialization.blocks.save(b, { addCoordinates: false });
+  const varsUsed = b.getDescendants(false).flatMap(d => d.getVarModels ? d.getVarModels() : []).map(v => ({ name: v.name, id: v.getId(), type: v.type || '' }));
+  to.blocks = to.blocks || { blocks: { languageVersion: 0, blocks: [] } };
+  to.blocks.blocks = to.blocks.blocks || { languageVersion: 0, blocks: [] };
+  const n = to.blocks.blocks.blocks.length;
+  json.x = 40 + n * 30; json.y = 40 + n * 30;
+  to.blocks.blocks.blocks.push(json);
+  to.blocks.variables = to.blocks.variables || [];
+  for (const v of varsUsed) if (!to.blocks.variables.some(x => x.id === v.id)) to.blocks.variables.push(v);
+  const now = b.getRelativeToSurfaceXY(); setTimeout(() => b.moveBy(info.xy.x - now.x, info.xy.y - now.y), 0);
+  toast(`Скрипт скопирован в «${to.name}»`); renderList(); scheduleSave();
+});
+
+/* ---------------- object list & props ---------------- */
+for (const [k, [n, g]] of Object.entries(SHAPES)) {
+  const b = document.createElement('button'); b.className = 'btn sm'; b.textContent = g + ' ' + n; b.title = 'Добавить: ' + n;
+  b.onclick = () => { if (RT.running) stopGame(); const o = newObj(k); project.objects.push(o); meshes.set(o.id, makeMesh(o)); select(o.id); scheduleSave(); };
+  $('#addBar').append(b);
+  const opt = document.createElement('option'); opt.value = k; opt.textContent = n; $('#pShape').append(opt);
+}
+function countScripts(o) { return (o.blocks?.blocks?.blocks || []).filter(b => b.type in HATS).length; }
+function renderList() {
+  const box = $('#objList'); box.textContent = '';
+  for (const o of project.objects) {
+    const b = document.createElement('button'); b.className = 'obj' + (o.id === currentId ? ' sel' : ''); b.dataset.id = o.id;
+    const n = o.id === currentId ? ws.getTopBlocks(false).filter(x => x.type in HATS).length : countScripts(o);
+    b.innerHTML = `<span class="sw" style="background:${o.color}">${SHAPES[o.shape][1]}</span><span style="min-width:0"><span class="nm"></span><span class="ct">${n} скрипт${n === 1 ? '' : n > 1 && n < 5 ? 'а' : 'ов'}</span></span>`;
+    b.querySelector('.nm').textContent = o.name;
+    b.onclick = () => select(o.id);
+    box.append(b);
+  }
+}
+function fillProps() {
+  const o = curObj(); $('#propsPanel').hidden = !o; if (!o) return;
+  $('#pName').value = o.name; $('#pShape').value = o.shape; $('#pColor').value = o.color;
+  $('#pX').value = o.pos[0]; $('#pY').value = o.pos[1]; $('#pZ').value = o.pos[2]; $('#pR').value = o.rot[is2D() ? 2 : 1]; $('#pS').value = Math.round(o.scale[0] * 100);
+  $('#heroProps').hidden = o.shape !== 'hero';
+  if (o.shape === 'hero') { const L = { ...HERO_LOOK, ...(o.look || {}) }; $('#pSkin').value = L.skin; $('#pPants').value = L.pants; $('#pHair').value = L.hair; $('#pHat').value = L.hat; $('#pShirt').value = o.color; }
+}
+function select(id) {
+  if (currentId && currentId !== id) saveWs();
+  currentId = id; const o = curObj();
+  loadWs(o); $('#curName').textContent = o ? o.name : '—';
+  renderList(); fillProps(); attachGizmo(); updateEmpty();
+}
+function updateEmpty() { $('#emptyHint').hidden = ws.getTopBlocks(false).length > 0; }
+function attachGizmo() { const m = meshes.get(currentId); if (m && !RT.running) tc.attach(m); else tc.detach(); }
+function propChanged() {
+  const o = curObj(); if (!o) return;
+  o.shape = $('#pShape').value; o.color = $('#pColor').value;
+  o.pos = [toNum($('#pX').value), toNum($('#pY').value), toNum($('#pZ').value)];
+  o.rot = is2D() ? [o.rot[0], o.rot[1], toNum($('#pR').value)] : [o.rot[0], toNum($('#pR').value), o.rot[2]];
+  if (o.shape === 'hero') o.look = { ...HERO_LOOK, ...(o.look || {}) };
+  const s = Math.max(1, toNum($('#pS').value)) / 100, k = s / (o.scale[0] || 1); o.scale = o.scale.map(v => Math.round(v * k * 100) / 100);
+  applyObj(meshes.get(o.id), o); renderList(); scheduleSave();
+}
+['#pShape', '#pColor', '#pX', '#pY', '#pZ', '#pR', '#pS'].forEach(s => $(s).addEventListener('input', propChanged));
+['#pSkin', '#pPants', '#pHair', '#pHat', '#pShirt'].forEach(s => $(s).addEventListener('input', () => {
+  const o = curObj(); if (!o) return;
+  o.look = { skin: $('#pSkin').value, pants: $('#pPants').value, hair: $('#pHair').value, hat: $('#pHat').value }; o.color = $('#pShirt').value; $('#pColor').value = o.color;
+  applyObj(meshes.get(o.id), o); renderList(); scheduleSave();
+}));
+document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => { if (project.mode !== b.dataset.m) { setMode(b.dataset.m); scheduleSave(); toast(is2D() ? 'Режим 2D: мир сбоку, вращай колёсиком и двигай мышкой' : 'Режим 3D: крути камеру мышкой'); } });
+$('#pName').addEventListener('change', () => {
+  const o = curObj(); const nv = $('#pName').value.trim();
+  if (!nv || nv === o.name) { $('#pName').value = o.name; return; }
+  if (objByName(nv)) { toast('Объект с таким именем уже есть', true); $('#pName').value = o.name; return; }
+  saveWs(); const old = o.name; o.name = nv;
+  const walk = x => { if (Array.isArray(x)) return x.forEach(walk); if (x && typeof x === 'object') { if (x.fields && x.fields.OBJ === old) x.fields.OBJ = nv; Object.values(x).forEach(walk); } };
+  project.objects.forEach(p => walk(p.blocks));
+  loadWs(o); $('#curName').textContent = nv; renderList(); scheduleSave();
+});
+$('#dupBtn').onclick = () => {
+  const o = curObj(); if (!o) return; if (RT.running) stopGame(); saveWs();
+  const c = JSON.parse(JSON.stringify(o)); c.id = uid(); c.name = uniqueName(o.name); c.pos = [o.pos[0] + 1.5, o.pos[1], o.pos[2]];
+  project.objects.push(c); meshes.set(c.id, makeMesh(c)); select(c.id); scheduleSave();
+};
+$('#delBtn').onclick = async () => {
+  const o = curObj(); if (!o) return;
+  if (!(await dialog({ title: `Удалить «${o.name}»?`, text: 'Объект и все его скрипты исчезнут.', ok: 'Удалить' }))) return;
+  if (RT.running) stopGame();
+  tc.detach(); const m = meshes.get(o.id); scene.remove(m); m.material.dispose(); meshes.delete(o.id);
+  project.objects = project.objects.filter(x => x !== o); currentId = null;
+  select(project.objects[0]?.id || null); scheduleSave();
+};
+document.querySelectorAll('.stage-tools [data-mode]').forEach(b => b.onclick = () => {
+  tc.setMode(b.dataset.mode); document.querySelectorAll('.stage-tools [data-mode]').forEach(x => x.classList.toggle('on', x === b));
+});
+$('#camReset').onclick = () => { RT.follow = null; resetCam(); };
+$('#fullBtn').onclick = () => { (document.fullscreenElement ? document.exitFullscreen() : stageEl.requestFullscreen?.())?.catch?.(() => toast('Полноэкранный режим недоступен здесь', true)); };
+
+/* picking */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); let downAt = null;
+function pick(e) {
+  const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const list = RT.running ? RT.actors.filter(a => !a.dead && a.mesh.visible).map(a => a.mesh) : [...meshes.values()];
+  for (const h of ray.intersectObjects(list, true)) { let o = h.object; while (o && !list.includes(o)) o = o.parent; if (o) return o; }
+  return null;
+}
+const plane3 = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), plane2 = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+canvas.addEventListener('pointermove', e => {
+  const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera); ray.ray.intersectPlane(is2D() ? plane2 : plane3, RT.mouseWorld);
+});
+canvas.addEventListener('pointerdown', e => {
+  downAt = { x: e.clientX, y: e.clientY }; RT.mouseDown = true;
+  if (RT.running) { const m = pick(e); const a = m && RT.actors.find(x => x.mesh === m); if (a) fire('ev_click', null, [a]); }
+});
+addEventListener('pointerup', e => {
+  RT.mouseDown = false;
+  if (!downAt || e.target !== canvas) { downAt = null; return; }
+  const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y); downAt = null;
+  if (RT.running || moved > 5 || tc.dragging || tc.axis) return;
+  const m = pick(e); if (m && m.userData.objId !== currentId) select(m.userData.objId);
+});
+
+/* ---------------- audio ---------------- */
+const Snd = {
+  ctx: null, master: null,
+  ensure() {
+    try {
+      if (!this.ctx) { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); this.master = this.ctx.createGain(); this.master.gain.value = 0.45; this.master.connect(this.ctx.destination); }
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+    } catch (e) { }
+  },
+  tone(f, d, type = 'triangle', at = 0, vol = 0.5, to = null) {
+    if (!this.ctx) return; const t = this.ctx.currentTime + at, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + d);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + d + 0.05);
+  },
+  noise(d) {
+    if (!this.ctx) return; const n = this.ctx.sampleRate * d, buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate), ch = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+    const s = this.ctx.createBufferSource(), g = this.ctx.createGain(), f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900; g.gain.value = 0.9;
+    s.buffer = buf; s.connect(f).connect(g).connect(this.master); s.start();
+  },
+  fx(n) {
+    ({ jump: () => this.tone(260, 0.2, 'square', 0, 0.25, 720), coin: () => { this.tone(988, 0.08, 'square', 0, 0.25); this.tone(1319, 0.3, 'square', 0.08, 0.25); },
+      boom: () => this.noise(0.7), laser: () => this.tone(1400, 0.25, 'sawtooth', 0, 0.22, 140), pop: () => this.tone(500, 0.08, 'sine', 0, 0.5, 1100),
+      win: () => [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.22, 'triangle', i * 0.12, 0.45)), error: () => this.tone(220, 0.35, 'sawtooth', 0, 0.25, 80) })[n]?.();
+  },
+};
+
+/* ---------------- runtime ---------------- */
+const HALT = { halt: true }, BREAK = { brk: true }, CONT = { cont: true };
+class Ret { constructor(v) { this.v = v; } }
+const RT = { mouseWorld: new THREE.Vector3(), view: 'back', running: false, gen: 0, actors: [], vars: {}, waiters: [], keys: new Set(), mouseDown: false, t0: 0, answer: '', g: 20, follow: null, shake: 0, parts: [], askResolve: null, savedCam: null };
+const BOUND = 29;
+
+function boxOf(a, pad = 0) { const b = new THREE.Box3().setFromObject(a.mesh); if (pad) b.expandByScalar(pad); return b; }
+function actorsNamed(n) { return RT.actors.filter(a => !a.dead && a.name === n); }
+
+class Actor {
+  constructor(obj, mesh, isClone = false) {
+    Object.assign(this, { obj, name: obj.name, mesh, isClone, vel: new THREE.Vector3(), grav: false, ground: false, bounce: 0, passable: false, handlers: [], dead: false,
+      touchPrev: {}, trailOn: false, trail: null, bubble: null, wave: 'triangle', glowOn: false, gen: RT.gen,
+      look: obj.look, walk: 0, amp: 0, face: -1, waveT: 0, lastP: mesh.position.clone() });
+    const prog = obj.prog;
+    for (const h of prog.hats) this.handlers.push({ type: h.type, arg: h.arg, block: h.block, active: false, promise: null, next: 0 });
+  }
+  check() { if (this.gen !== RT.gen || !RT.running || this.dead) throw HALT; }
+  y() { this.check(); return new Promise(r => RT.waiters.push(r)).then(() => this.check()); }
+  async wait(s) { const end = performance.now() + toNum(s) * 1000; do { await this.y(); } while (performance.now() < end); }
+  fwd() {
+    if (is2D()) { const r = this.mesh.rotation.z; return new THREE.Vector3(Math.cos(r), Math.sin(r), 0); }
+    return new THREE.Vector3(0, 0, -1).applyQuaternion(this.mesh.quaternion);
+  }
+  target(n) {
+    if (n === '__camera') return camera.position.clone();
+    if (n === '__random') return new THREE.Vector3((Math.random() * 2 - 1) * 10, this.mesh.position.y, is2D() ? 0 : (Math.random() * 2 - 1) * 10);
+    if (n === '__mouse') { const p = RT.mouseWorld.clone(); if (!is2D()) p.y = this.mesh.position.y; return p; }
+    const t = actorsNamed(n).find(a => !a.isClone) || actorsNamed(n)[0]; return t ? t.mesh.position.clone() : null;
+  }
+  touching(n) {
+    if (!this.mesh.visible) return false;
+    const b = boxOf(this, 0.03);
+    if (n === '__ground') return floorGroup.visible && b.min.y <= 0.04;
+    return RT.actors.some(a => a !== this && !a.dead && a.mesh.visible && (n === '__any' || a.name === n) && b.intersectsBox(boxOf(a)));
+  }
+  say(t) {
+    t = fmt(t);
+    if (!t) { this.bubble?.remove(); this.bubble = null; return; }
+    if (!this.bubble) { this.bubble = document.createElement('div'); this.bubble.className = 'bubble'; $('#overlay').append(this.bubble); }
+    this.bubble.textContent = t;
+  }
+  clone(n) {
+    const src = n === '__self' ? this : (actorsNamed(n).find(a => !a.isClone) || actorsNamed(n)[0]);
+    if (!src) return;
+    if (RT.actors.filter(a => a.isClone && !a.dead).length >= 300) { toast('Слишком много копий (максимум 300)', true); return; }
+    const m = src.mesh.clone(); m.material = src.mesh.material.clone();
+    m.traverse(ch => { if (ch === m || !ch.material) return; ch.material = ch.userData.shared ? m.material : ch.material.clone(); });
+    scene.add(m);
+    const c = new Actor(src.obj, m, true);
+    Object.assign(c, { grav: src.grav, bounce: src.bounce, passable: src.passable, wave: src.wave, look: src.look, face: src.face }); c.vel.copy(src.vel);
+    RT.actors.push(c); fire('ev_clone', null, [c]);
+  }
+  remove() { this.dead = true; this.say(''); if (this.isClone) { scene.remove(this.mesh); this.mesh.material.dispose(); } }
+  async ask(q) {
+    this.say(q); const f = $('#askForm'), inp = $('#askInput'); f.hidden = false; inp.value = ''; inp.focus();
+    let ans = null; RT.askResolve = v => { ans = v; };
+    try { while (ans === null) await this.y(); } finally { f.hidden = true; this.say(''); RT.askResolve = null; }
+    RT.answer = ans;
+  }
+}
+
+/* --- interpreter over Blockly JSON --- */
+function compile(o) {
+  const vars = {}; for (const v of o.blocks?.variables || []) vars[v.id] = v.name;
+  const hats = [], procs = {};
+  for (const b of o.blocks?.blocks?.blocks || []) {
+    if (b.enabled === false) continue;
+    if (b.type in HATS) hats.push({ type: b.type, arg: HATS[b.type] ? String(b.fields?.[HATS[b.type]] ?? '') : null, block: b.next?.block || null });
+    else if (b.type === 'procedures_defnoreturn' || b.type === 'procedures_defreturn') procs[b.fields?.NAME] = b;
+  }
+  return { vars, hats, procs };
+}
+class Interp {
+  constructor(a) { this.a = a; this.prog = a.obj.prog; this.locals = []; }
+  inp(b, n) { const i = b.inputs?.[n]; return i ? (i.block || i.shadow || null) : null; }
+  async val(b, n, d = 0) { const x = this.inp(b, n); return x ? await this.ev(x) : d; }
+  async num(b, n) { return toNum(await this.val(b, n, 0)); }
+  async str(b, n) { return fmt(await this.val(b, n, '')); }
+  async bool(b, n) { return !!(await this.val(b, n, false)); }
+  vname(b) { const f = b.fields?.VAR; return (f && (this.prog.vars[f.id] || f.name)) || '?'; }
+  getVar(n) { const fr = this.locals[this.locals.length - 1]; if (fr && n in fr) return fr[n]; return RT.vars[n] ?? 0; }
+  setVar(n, v) { const fr = this.locals[this.locals.length - 1]; if (fr && n in fr) fr[n] = v; else RT.vars[n] = v; }
+  async run(b) { while (b) { if (b.enabled !== false) await this.exec(b); b = b.next?.block; } }
+  async loop(body) { try { await this.run(body); } catch (e) { if (e === BREAK) return true; if (e === CONT) return false; throw e; } return false; }
+  async exec(b) { const f = EX[b.type]; if (!f) throw new Error('блок «' + b.type + '» не умеет выполняться'); await f.call(this, b, this.a); }
+  async ev(b) { const f = EV[b.type]; if (!f) throw new Error('блок «' + b.type + '» не возвращает значение'); return await f.call(this, b, this.a); }
+  async call(b) {
+    const name = b.extraState?.name, d = this.prog.procs[name];
+    if (!d) throw new Error(`нет функции «${name}»`);
+    if (this.locals.length > 250) throw new Error('слишком глубокая рекурсия');
+    const fr = {}; const params = d.extraState?.params || [];
+    for (let i = 0; i < params.length; i++) fr[params[i].name] = await this.val(b, 'ARG' + i, 0);
+    this.locals.push(fr);
+    try { await this.run(d.inputs?.STACK?.block); return d.inputs?.RETURN ? await this.val(d, 'RETURN', 0) : undefined; }
+    catch (e) { if (e instanceof Ret) return e.v; throw e; }
+    finally { this.locals.pop(); }
+  }
+}
+const ON = (b, n = 'ON') => b.fields?.[n] === 'on';
+const F = (b, n) => b.fields?.[n];
+const EX = {
+  ev_broadcast(b) { fire('ev_msg', String(F(b, 'MSG'))); },
+  async ev_broadcastwait(b) { await fire('ev_msg', String(F(b, 'MSG'))); },
+  async ct_wait(b, a) { await a.wait(await this.num(b, 'N')); },
+  async ct_forever(b, a) { const body = this.inp(b, 'DO'); for (;;) { await a.y(); if (await this.loop(body)) break; } },
+  async controls_repeat_ext(b, a) { const n = await this.num(b, 'TIMES'), body = this.inp(b, 'DO'); for (let i = 0; i < n; i++) { await a.y(); if (await this.loop(body)) break; } },
+  async controls_repeat(b, a) { const n = toNum(F(b, 'TIMES')), body = this.inp(b, 'DO'); for (let i = 0; i < n; i++) { await a.y(); if (await this.loop(body)) break; } },
+  async controls_whileUntil(b, a) { const until = F(b, 'MODE') === 'UNTIL', body = this.inp(b, 'DO'); while ((await this.bool(b, 'BOOL')) !== until) { await a.y(); if (await this.loop(body)) break; } },
+  async controls_for(b, a) {
+    const n = this.vname(b), from = await this.num(b, 'FROM'), to = await this.num(b, 'TO'), by = Math.abs(await this.num(b, 'BY')) || 1, body = this.inp(b, 'DO');
+    const up = from <= to; for (let i = from; up ? i <= to : i >= to; i += up ? by : -by) { this.setVar(n, i); await a.y(); if (await this.loop(body)) break; }
+  },
+  async controls_forEach(b, a) { const n = this.vname(b), list = await this.val(b, 'LIST', []), body = this.inp(b, 'DO'); for (const x of Array.isArray(list) ? list : []) { this.setVar(n, x); await a.y(); if (await this.loop(body)) break; } },
+  async controls_if(b) {
+    const k = b.extraState?.elseIfCount || 0;
+    for (let i = 0; i <= k; i++) if (await this.bool(b, 'IF' + i)) return this.run(this.inp(b, 'DO' + i));
+    if (b.extraState?.hasElse) await this.run(this.inp(b, 'ELSE'));
+  },
+  controls_flow_statements(b) { throw F(b, 'FLOW') === 'BREAK' ? BREAK : CONT; },
+  async ct_waituntil(b, a) { while (!(await this.bool(b, 'COND'))) await a.y(); },
+  ct_stop(b) { if (F(b, 'W') === 'all') { setTimeout(stopGame, 0); } throw HALT; },
+  ct_clone(b, a) { a.clone(F(b, 'OBJ')); },
+  ct_delclone(b, a) { if (a.isClone) { a.remove(); throw HALT; } },
+  async variables_set(b) { this.setVar(this.vname(b), await this.val(b, 'VALUE', 0)); },
+  async math_change(b) { const n = this.vname(b); this.setVar(n, toNum(this.getVar(n)) + await this.num(b, 'DELTA')); },
+  async procedures_callnoreturn(b) { await this.call(b); },
+  async procedures_ifreturn(b) { if (await this.bool(b, 'CONDITION')) throw new Ret(b.inputs?.VALUE ? await this.val(b, 'VALUE', 0) : undefined); },
+  async lists_setIndex(b) {
+    const list = await this.val(b, 'LIST', []); if (!Array.isArray(list)) return;
+    const idx = await listIndex(this, b, list, F(b, 'MODE') === 'INSERT'); const v = await this.val(b, 'TO', 0);
+    if (F(b, 'MODE') === 'INSERT') list.splice(idx, 0, v); else if (idx >= 0) list[idx] = v;
+  },
+  async lists_getIndex(b) { await EV.lists_getIndex.call(this, b); },
+  // motion
+  async mv_move(b, a) { a.mesh.position.addScaledVector(a.fwd(), await this.num(b, 'N')); },
+  async mv_rotate(b, a) { a.mesh.rotation[rax(b)] += (await this.num(b, 'N')) * DEG; },
+  async mv_moveaxis(b, a) { a.mesh.position[F(b, 'AX')] += await this.num(b, 'N'); },
+  async mv_setpos(b, a) { a.mesh.position.set(await this.num(b, 'X'), await this.num(b, 'Y'), await this.num(b, 'Z')); a.vel.set(0, 0, 0); },
+  async mv_setaxis(b, a) { a.mesh.position[F(b, 'AX')] = await this.num(b, 'N'); },
+  async mv_setrot(b, a) { a.mesh.rotation[rax(b)] = (await this.num(b, 'N')) * DEG; },
+  async mv_glide(b, a) {
+    const T = Math.max(0.001, await this.num(b, 'T')), to = new THREE.Vector3(await this.num(b, 'X'), await this.num(b, 'Y'), await this.num(b, 'Z'));
+    const from = a.mesh.position.clone(), t0 = performance.now();
+    for (;;) { const k = Math.min(1, (performance.now() - t0) / (T * 1000)); a.mesh.position.lerpVectors(from, to, k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2); if (k >= 1) break; await a.y(); }
+  },
+  mv_goto(b, a) { const p = a.target(F(b, 'OBJ')); if (p) a.mesh.position.copy(p); },
+  mv_lookat(b, a) {
+    const p = a.target(F(b, 'OBJ')); if (!p) return;
+    if (is2D()) { const dx = p.x - a.mesh.position.x, dy = p.y - a.mesh.position.y; if (a.mesh.userData.shape === 'hero') a.face = dx < 0 ? 1 : -1; else if (dx || dy) a.mesh.rotation.z = Math.atan2(dy, dx); return; }
+    const dx = p.x - a.mesh.position.x, dz = p.z - a.mesh.position.z; if (dx || dz) a.mesh.rotation.y = Math.atan2(-dx, -dz); },
+  mv_bounce(b, a) {
+    const p = a.mesh.position, r = a.mesh.rotation;
+    if (is2D()) { if (Math.abs(p.x) > BOUND) { p.x = Math.sign(p.x) * BOUND; r.z = Math.PI - r.z; a.vel.x *= -1; } return; }
+    if (Math.abs(p.x) > BOUND) { p.x = Math.sign(p.x) * BOUND; r.y = -r.y; a.vel.x *= -1; }
+    if (Math.abs(p.z) > BOUND) { p.z = Math.sign(p.z) * BOUND; r.y = Math.PI - r.y; a.vel.z *= -1; }
+  },
+  // looks
+  async lk_say(b, a) { a.say(await this.val(b, 'TEXT', '')); },
+  async lk_sayfor(b, a) { a.say(await this.val(b, 'TEXT', '')); await a.wait(await this.num(b, 'N')); a.say(''); },
+  lk_color(b, a) { a.mesh.material.color.set(F(b, 'C')); if (a.glowOn) a.mesh.material.emissive.copy(a.mesh.material.color).multiplyScalar(0.7); },
+  lk_colorrand(b, a) { a.mesh.material.color.setHSL(Math.random(), 0.7, 0.55); if (a.glowOn) a.mesh.material.emissive.copy(a.mesh.material.color).multiplyScalar(0.7); },
+  async lk_size(b, a) { a.mesh.scale.setScalar(Math.max(0, await this.num(b, 'N')) / 100); },
+  async lk_changesize(b, a) { const cur = a.mesh.scale.x * 100 || 1, nv = Math.max(0, cur + await this.num(b, 'N')); a.mesh.scale.multiplyScalar(nv / cur); },
+  async lk_stretch(b, a) { a.mesh.scale.set(await this.num(b, 'X') / 100, await this.num(b, 'Y') / 100, await this.num(b, 'Z') / 100); },
+  lk_show(b, a) { a.mesh.visible = true; },
+  lk_hide(b, a) { a.mesh.visible = false; a.say(''); },
+  lk_shape(b, a) { a.mesh.userData.shape = F(b, 'S'); a.mesh.geometry = geo(F(b, 'S')); heroParts(a.mesh, a.look); },
+  lk_hat(b, a) { a.look = { ...HERO_LOOK, ...(a.look || {}), hat: F(b, 'H') }; heroParts(a.mesh, a.look); },
+  lk_wave(b, a) { a.waveT = 1.4; },
+  async lk_opacity(b, a) { const p = Math.min(100, Math.max(0, await this.num(b, 'N'))); a.mesh.material.transparent = p < 100; a.mesh.material.opacity = p / 100; a.mesh.material.needsUpdate = true; },
+  lk_glow(b, a) { a.glowOn = ON(b); a.mesh.material.emissive.copy(a.mesh.material.color).multiplyScalar(a.glowOn ? 0.7 : 0); },
+  lk_wire(b, a) { a.mesh.material.wireframe = ON(b); },
+  // physics
+  ph_gravity(b, a) { a.grav = ON(b); if (!a.grav) a.vel.y = 0; },
+  async ph_jump(b, a) { a.vel.y = await this.num(b, 'N'); a.ground = false; },
+  async ph_push(b, a) {
+    const f = a.fwd(), n = await this.num(b, 'N');
+    if (is2D()) { if (a.mesh.userData.shape === 'hero') f.set(-a.face, 0, 0); a.vel.x += f.x * n; a.vel.y += f.y * n; return; }
+    f.y = 0; f.normalize().multiplyScalar(n); a.vel.x += f.x; a.vel.z += f.z;
+  },
+  async ph_vel(b, a) { a.vel.set(await this.num(b, 'X'), await this.num(b, 'Y'), await this.num(b, 'Z')); },
+  async ph_bounce(b, a) { a.bounce = Math.min(100, Math.max(0, await this.num(b, 'N'))) / 100; },
+  ph_solid(b, a) { a.passable = ON(b); },
+  async ph_worldg(b) { RT.g = await this.num(b, 'N'); },
+  // sensing
+  async sn_ask(b, a) { await a.ask(await this.str(b, 'TEXT')); },
+  sn_resettimer() { RT.t0 = performance.now(); },
+  // sound
+  async sd_note(b, a) { const m = await this.num(b, 'N'), t = Math.max(0.02, await this.num(b, 'T')); Snd.tone(440 * 2 ** ((m - 69) / 12), t, a.wave, 0, 0.45); await a.wait(t); },
+  sd_instr(b, a) { a.wave = F(b, 'W'); },
+  async sd_melody(b, a) { let t = 0; for (const [n, d] of MELODIES[F(b, 'M')] || []) { Snd.tone(440 * 2 ** ((n - 69) / 12), d * 0.95, a.wave, t, 0.4); t += d; } await a.wait(t); },
+  sd_fx(b) { Snd.fx(F(b, 'FX')); },
+  async sd_speak(b) { const t = await this.str(b, 'TEXT'); try { const u = new SpeechSynthesisUtterance(t); u.lang = 'ru-RU'; speechSynthesis.speak(u); } catch (e) { } },
+  async sd_volume(b) { const v = Math.min(100, Math.max(0, await this.num(b, 'N'))); if (Snd.master) Snd.master.gain.value = 0.6 * v / 100; },
+  // world
+  wd_time(b) { setTime(F(b, 'T')); },
+  wd_sky(b) { setSky(F(b, 'C')); },
+  wd_fog(b) { setFog(ON(b)); },
+  wd_floor(b) { floorGroup.visible = ON(b); },
+  async wd_follow(b, a) { RT.follow = { a, d: Math.max(1, await this.num(b, 'N')) }; },
+  async wd_campos(b) {
+    RT.follow = null; const x = await this.num(b, 'X'), y = await this.num(b, 'Y'), z = await this.num(b, 'Z');
+    if (is2D()) { camera.position.set(x, y, 40); orbit.target.set(x, y, 0); } else { camera.position.set(x, y, z); orbit.target.set(0, 1, 0); }
+  },
+  wd_view(b, a) { RT.view = F(b, 'V'); if (!RT.follow) RT.follow = { a, d: 7 }; },
+  wd_weather(b) { setWeather(F(b, 'W')); },
+  wd_camfree() { RT.follow = null; },
+  wd_shake() { RT.shake = 0.6; },
+  wd_boom(b, a) { boom(a.mesh.position, F(b, 'C')); },
+  async wd_hud(b) { $('#hud').textContent = await this.str(b, 'TEXT'); },
+  wd_trail(b, a) { a.trailOn = ON(b); a.trail = null; },
+  wd_cleartrails() { clearTrails(); },
+};
+const rax = b => is2D() && F(b, 'AX') === 'y' ? 'z' : F(b, 'AX');
+const MELODIES = {
+  happy: [[60, .15], [64, .15], [67, .15], [72, .3], [67, .15], [72, .45]], win: [[67, .12], [72, .12], [76, .12], [79, .3], [76, .12], [79, .55]],
+  sad: [[69, .4], [67, .4], [65, .4], [64, .8]], mystery: [[62, .3], [65, .3], [69, .3], [68, .6], [62, .6]],
+  dance: [[60, .13], [60, .13], [67, .13], [67, .13], [69, .13], [69, .13], [67, .3], [65, .13], [65, .13], [64, .13], [64, .13], [62, .13], [62, .13], [60, .3]],
+};
+async function listIndex(it, b, list, insert) {
+  const where = F(b, 'WHERE'), n = list.length;
+  if (where === 'FIRST') return 0;
+  if (where === 'LAST') return insert ? n : n - 1;
+  if (where === 'RANDOM') return Math.floor(Math.random() * (insert ? n + 1 : n));
+  const at = Math.floor(await it.num(b, 'AT'));
+  return where === 'FROM_END' ? n - at + (insert ? 1 : 0) : at - 1;
+}
+const cmp = (x, y) => { const a = Number(x), b = Number(y); return (x !== '' && y !== '' && !isNaN(a) && !isNaN(b)) ? a - b : String(x).toLowerCase().localeCompare(String(y).toLowerCase()); };
+const EV = {
+  math_number: b => toNum(F(b, 'NUM')),
+  text: b => String(F(b, 'TEXT') ?? ''),
+  logic_boolean: b => F(b, 'BOOL') === 'TRUE',
+  async math_arithmetic(b) {
+    const x = await this.num(b, 'A'), y = await this.num(b, 'B');
+    return ({ ADD: x + y, MINUS: x - y, MULTIPLY: x * y, DIVIDE: y === 0 ? 0 : x / y, POWER: x ** y })[F(b, 'OP')];
+  },
+  async math_single(b) { const x = await this.num(b, 'NUM'); return ({ ROOT: Math.sqrt(x), ABS: Math.abs(x), NEG: -x, LN: Math.log(x), LOG10: Math.log10(x), EXP: Math.exp(x), POW10: 10 ** x })[F(b, 'OP')]; },
+  async math_trig(b) { const x = await this.num(b, 'NUM'); return ({ SIN: Math.sin(x * DEG), COS: Math.cos(x * DEG), TAN: Math.tan(x * DEG), ASIN: Math.asin(x) / DEG, ACOS: Math.acos(x) / DEG, ATAN: Math.atan(x) / DEG })[F(b, 'OP')]; },
+  async math_round(b) { const x = await this.num(b, 'NUM'); return ({ ROUND: Math.round(x), ROUNDUP: Math.ceil(x), ROUNDDOWN: Math.floor(x) })[F(b, 'OP')]; },
+  async math_modulo(b) { const x = await this.num(b, 'DIVIDEND'), y = await this.num(b, 'DIVISOR'); return y ? ((x % y) + y) % y : 0; },
+  async math_random_int(b) { let x = await this.num(b, 'FROM'), y = await this.num(b, 'TO'); if (x > y) [x, y] = [y, x]; return Math.floor(Math.random() * (Math.floor(y) - Math.ceil(x) + 1)) + Math.ceil(x); },
+  math_random_float: () => Math.random(),
+  async logic_compare(b) { const c = cmp(await this.val(b, 'A', 0), await this.val(b, 'B', 0)); return ({ EQ: c === 0, NEQ: c !== 0, LT: c < 0, LTE: c <= 0, GT: c > 0, GTE: c >= 0 })[F(b, 'OP')]; },
+  async logic_operation(b) { const and = F(b, 'OP') === 'AND'; const x = await this.bool(b, 'A'); if (and ? !x : x) return x; return await this.bool(b, 'B'); },
+  async logic_negate(b) { return !(await this.bool(b, 'BOOL')); },
+  async text_join(b) { let s = ''; for (let i = 0; i < (b.extraState?.itemCount || 0); i++) s += await this.str(b, 'ADD' + i); return s; },
+  async text_length(b) { const v = await this.val(b, 'VALUE', ''); return Array.isArray(v) ? v.length : fmt(v).length; },
+  async lists_create_with(b) { const out = []; for (let i = 0; i < (b.extraState?.itemCount || 0); i++) out.push(await this.val(b, 'ADD' + i, 0)); return out; },
+  lists_create_empty: () => [],
+  async lists_length(b) { const v = await this.val(b, 'VALUE', []); return Array.isArray(v) ? v.length : fmt(v).length; },
+  async lists_getIndex(b) {
+    const list = await this.val(b, 'VALUE', []); if (!Array.isArray(list)) return 0;
+    const i = await listIndex(this, b, list, false); const v = list[i];
+    if (F(b, 'MODE') !== 'GET' && i >= 0 && i < list.length) list.splice(i, 1);
+    return v ?? 0;
+  },
+  variables_get(b) { return this.getVar(this.vname(b)); },
+  async procedures_callreturn(b) { return await this.call(b); },
+  mv_pos: (b, a) => Math.round(a.mesh.position[F(b, 'AX')] * 1000) / 1000,
+  mv_rot: (b, a) => Math.round(a.mesh.rotation[rax(b)] / DEG * 10) / 10,
+  sn_mxy: b => Math.round(RT.mouseWorld[F(b, 'AX')] * 100) / 100,
+  lk_sizer: (b, a) => Math.round(a.mesh.scale.x * 100),
+  ph_onground: (b, a) => a.ground,
+  sn_key: b => F(b, 'KEY') === 'any' ? RT.keys.size > 0 : RT.keys.has(F(b, 'KEY')),
+  sn_touch: (b, a) => a.touching(F(b, 'OBJ')),
+  sn_dist: (b, a) => { const p = a.target(F(b, 'OBJ')); return p ? Math.round(p.distanceTo(a.mesh.position) * 100) / 100 : 0; },
+  sn_mouse: () => RT.mouseDown,
+  sn_answer: () => RT.answer,
+  sn_timer: () => Math.round((performance.now() - RT.t0) / 10) / 100,
+  sn_name: (b, a) => a.name,
+  sn_isclone: (b, a) => a.isClone,
+};
+
+function runHandler(a, h) {
+  if (h.active) return h.promise;
+  h.active = true;
+  const it = new Interp(a);
+  h.promise = (async () => {
+    try { await it.run(h.block); }
+    catch (e) {
+      if (e === HALT || e === BREAK || e === CONT || e instanceof Ret) return;
+      console.error(e); toast(`Ошибка в «${a.name}»: ${e.message}`, true);
+    } finally { h.active = false; }
+  })();
+  return h.promise;
+}
+function fire(type, arg = null, list = RT.actors) {
+  if (!RT.running) return Promise.resolve();
+  const ps = [];
+  for (const a of list.slice()) {
+    if (a.dead) continue;
+    for (const h of a.handlers) {
+      if (h.type !== type) continue;
+      if (type === 'ev_key' ? (h.arg !== arg && h.arg !== 'any') : type === 'ev_msg' ? h.arg.trim().toLowerCase() !== String(arg).trim().toLowerCase() : false) continue;
+      ps.push(runHandler(a, h));
+    }
+  }
+  return Promise.all(ps);
+}
+
+function startGame() {
+  Snd.ensure();
+  if (RT.running) stopGame();
+  saveWs(); saveNow();
+  RT.savedCam = { pos: camera.position.clone(), target: orbit.target.clone() };
+  RT.gen++; RT.running = true; RT.vars = {}; RT.t0 = performance.now(); RT.g = 20; RT.follow = null; RT.answer = ''; RT.keys.clear();
+  for (const n of project.vars) RT.vars[n] = 0;
+  resetWorld(); tc.detach(); RT.view = 'back';
+  if (is2D()) for (const m of meshes.values()) m.position.z = 0;
+  RT.actors = project.objects.map(o => { o.prog = compile(o); return new Actor(o, meshes.get(o.id)); });
+  const now = performance.now();
+  for (const a of RT.actors) for (const h of a.handlers) if (h.type === 'ev_timer') h.next = now + Math.max(0.05, toNum(h.arg)) * 1000;
+  stageEl.classList.add('running'); $('#runBadge').hidden = false; $('#runBtn').textContent = '↻ Заново';
+  fire('ev_start');
+}
+function stopGame() {
+  if (!RT.running) return;
+  RT.running = false; RT.gen++;
+  const w = RT.waiters; RT.waiters = []; w.forEach(r => r());
+  for (const a of RT.actors) { a.say(''); if (a.isClone) a.remove(); }
+  RT.actors = []; RT.follow = null; RT.keys.clear();
+  for (const o of project.objects) applyObj(meshes.get(o.id), o);
+  clearTrails(); RT.parts.forEach(p => { scene.remove(p.pts); p.pts.geometry.dispose(); p.pts.material.dispose(); }); RT.parts = [];
+  $('#hud').textContent = ''; $('#vars').textContent = ''; $('#askForm').hidden = true; stageEl.classList.remove('running'); $('#runBadge').hidden = true; $('#runBtn').textContent = '▶ Старт';
+  try { speechSynthesis.cancel(); } catch (e) { }
+  resetWorld();
+  if (RT.savedCam) { camera.position.copy(RT.savedCam.pos); orbit.target.copy(RT.savedCam.target); }
+  orbit.enabled = true; attachGizmo();
+}
+$('#runBtn').onclick = e => { e.currentTarget.blur(); startGame(); };
+$('#stopBtn').onclick = e => { e.currentTarget.blur(); stopGame(); };
+$('#askForm').addEventListener('submit', e => { e.preventDefault(); RT.askResolve?.($('#askInput').value); });
+
+const keyName = e => e.code === 'Space' ? 'space' : e.code === 'Enter' || e.code === 'NumpadEnter' ? 'enter' : e.code.startsWith('Arrow') ? e.code
+  : e.code.startsWith('Key') ? e.code.slice(3).toLowerCase() : e.code.startsWith('Digit') ? e.code.slice(5) : e.code.startsWith('Numpad') && /\d$/.test(e.code) ? e.code.slice(-1) : null;
+const typing = e => /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable;
+addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); startGame(); return; }
+  if (e.key === 'Escape' && RT.running && !typing(e)) { stopGame(); return; }
+  if (!RT.running || typing(e)) return;
+  const k = keyName(e); if (!k) return;
+  if (k === 'space' || k.startsWith('Arrow')) e.preventDefault();
+  RT.keys.add(k); if (!e.repeat) fire('ev_key', k);
+});
+addEventListener('keyup', e => { const k = keyName(e); if (k) RT.keys.delete(k); });
+addEventListener('blur', () => RT.keys.clear());
+
+/* effects */
+function boom(pos, color) {
+  const N = 80, p = new Float32Array(N * 3), v = [];
+  for (let i = 0; i < N; i++) { p.set([pos.x, pos.y, pos.z], i * 3); v.push(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.9 + 0.2, Math.random() - 0.5).normalize().multiplyScalar(3 + Math.random() * 5)); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color, size: 0.2, transparent: true, depthWrite: false }));
+  scene.add(pts); RT.parts.push({ pts, v, t: 0, life: 1.1 });
+}
+function clearTrails() { for (const l of [...trails.children]) { trails.remove(l); l.geometry.dispose(); l.material.dispose(); } for (const a of RT.actors) a.trail = null; }
+function updateTrail(a) {
+  if (!a.trailOn || a.dead) return;
+  if (!a.trail || a.trail.n >= 5000) {
+    const pos = new Float32Array(5000 * 3), g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setDrawRange(0, 0);
+    const line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: a.mesh.material.color.clone() })); line.frustumCulled = false; trails.add(line);
+    const prev = a.trail; a.trail = { line, pos, n: 0 };
+    if (prev) { const i = (prev.n - 1) * 3; pos.set([prev.pos[i], prev.pos[i + 1], prev.pos[i + 2]], 0); a.trail.n = 1; }
+  }
+  const t = a.trail, p = a.mesh.position;
+  if (t.n > 0) { const i = (t.n - 1) * 3; if ((t.pos[i] - p.x) ** 2 + (t.pos[i + 1] - p.y) ** 2 + (t.pos[i + 2] - p.z) ** 2 < 0.003) return; }
+  t.pos.set([p.x, p.y, p.z], t.n * 3); t.n++; t.line.geometry.setDrawRange(0, t.n); t.line.geometry.attributes.position.needsUpdate = true;
+}
+
+/* character animation */
+function animHero(a, dt) {
+  const m = a.mesh; if (m.userData.shape !== 'hero') return;
+  const p = m.position, dx = p.x - a.lastP.x, dz = is2D() ? 0 : p.z - a.lastP.z; a.lastP.copy(p);
+  const sp = Math.hypot(dx, dz) / Math.max(dt, 1e-3);
+  a.amp += ((sp > 0.3 && (a.ground || !a.grav) ? 1 : 0) - a.amp) * Math.min(1, dt * 10);
+  a.walk += sp * dt * 6;
+  const s = Math.sin(a.walk) * 0.75 * a.amp, lL = part(m, 'legL'), lR = part(m, 'legR'), aL = part(m, 'armL'), aR = part(m, 'armR');
+  if (!lL) return;
+  lL.rotation.x = s; lR.rotation.x = -s; aL.rotation.x = -s; aR.rotation.x = s;
+  const air = a.grav && !a.ground;
+  aL.rotation.z = air ? -0.6 : 0; aR.rotation.z = air ? 0.6 : 0;
+  if (a.waveT > 0) { a.waveT -= dt; aR.rotation.x = 0; aR.rotation.z = 2.6 + Math.sin(a.waveT * 14) * 0.35; }
+  if (is2D()) { if (Math.abs(dx) > 1e-4) a.face = dx < 0 ? 1 : -1; m.rotation.y = a.face * Math.PI / 2; }
+}
+
+/* physics */
+function physics(dt) {
+  for (const a of RT.actors) {
+    if (a.dead) continue;
+    const m = a.mesh;
+    if (a.grav) a.vel.y -= RT.g * dt;
+    if (a.vel.lengthSq() > 1e-8) m.position.addScaledVector(a.vel, dt);
+    if (!a.grav) continue;
+    a.ground = false;
+    let box = boxOf(a);
+    if (floorGroup.visible && box.min.y < 0 && (is2D() || (Math.abs(m.position.x) < 30 && Math.abs(m.position.z) < 30))) {
+      m.position.y -= box.min.y; landed(a); box = boxOf(a);
+    }
+    if (a.passable || !m.visible) continue;
+    for (const o of RT.actors) {
+      if (o === a || o.dead || o.passable || !o.mesh.visible) continue;
+      const ob = boxOf(o); if (!box.intersectsBox(ob)) continue;
+      const ox = Math.min(box.max.x - ob.min.x, ob.max.x - box.min.x), oy = Math.min(box.max.y - ob.min.y, ob.max.y - box.min.y), oz = Math.min(box.max.z - ob.min.z, ob.max.z - box.min.z);
+      const ac = box.getCenter(new THREE.Vector3()), oc = ob.getCenter(new THREE.Vector3());
+      if (oy <= ox && oy <= oz) {
+        if (ac.y >= oc.y) { m.position.y += oy; landed(a); } else { m.position.y -= oy; if (a.vel.y > 0) a.vel.y = 0; }
+      } else if (ox <= oz) { m.position.x += ac.x >= oc.x ? ox : -ox; a.vel.x = 0; }
+      else { m.position.z += ac.z >= oc.z ? oz : -oz; a.vel.z = 0; }
+      box = boxOf(a);
+    }
+    if (a.ground) { const k = Math.pow(0.02, dt); a.vel.x *= k; a.vel.z *= k; }
+  }
+}
+function landed(a) { if (a.vel.y < 0) { const v = -a.vel.y * a.bounce; a.vel.y = v > 1.5 ? v : 0; } a.ground = true; }
+
+/* main loop */
+const clock = new THREE.Clock(); let varsTick = 0;
+const tmpV = new THREE.Vector3();
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, clock.getDelta()), now = performance.now();
+  if (RT.running) {
+    const w = RT.waiters; RT.waiters = []; w.forEach(r => r());
+    for (const a of RT.actors) for (const h of a.handlers) if (h.type === 'ev_timer' && now >= h.next) { h.next = now + Math.max(0.05, toNum(h.arg)) * 1000; runHandler(a, h); }
+    if (is2D()) for (const a of RT.actors) { a.mesh.position.z = 0; a.vel.z = 0; }
+    physics(dt);
+    for (const a of RT.actors) {
+      if (a.dead) continue;
+      animHero(a, dt);
+      for (const h of a.handlers) if (h.type === 'ev_touch') { const t = a.touching(h.arg); if (t && !a.touchPrev[h.arg]) runHandler(a, h); a.touchPrev[h.arg] = t; }
+      updateTrail(a);
+    }
+    RT.actors = RT.actors.filter(a => !a.dead || !a.isClone);
+    if (now - varsTick > 150) {
+      varsTick = now; const box = $('#vars'); box.textContent = '';
+      for (const [k, v] of Object.entries(RT.vars)) { const d = document.createElement('div'); d.className = 'var-chip'; d.innerHTML = '<span></span>'; d.firstChild.textContent = k; d.append(fmt(v)); box.append(d); }
+    }
+  }
+  if (weather.pts.visible) {
+    const arr = weather.pts.geometry.attributes.position.array, sp = weather.kind === 'rain' ? 16 : weather.kind === 'leaves' ? 1.6 : 2.2, t = now / 1000;
+    for (let i = 0; i < arr.length; i += 3) {
+      arr[i + 1] -= sp * dt; if (weather.kind !== 'rain') arr[i] += Math.sin(t + i) * dt * 0.6;
+      if (arr[i + 1] < 0) arr[i + 1] += 20;
+    }
+    weather.pts.geometry.attributes.position.needsUpdate = true; weather.pts.position.set(orbit.target.x, 0, is2D() ? 0 : orbit.target.z);
+  }
+  for (let i = RT.parts.length - 1; i >= 0; i--) {
+    const p = RT.parts[i]; p.t += dt; const arr = p.pts.geometry.attributes.position.array;
+    p.v.forEach((v, j) => { v.y -= 9 * dt; arr[j * 3] += v.x * dt; arr[j * 3 + 1] += v.y * dt; arr[j * 3 + 2] += v.z * dt; });
+    p.pts.geometry.attributes.position.needsUpdate = true; p.pts.material.opacity = Math.max(0, 1 - p.t / p.life);
+    if (p.t > p.life) { scene.remove(p.pts); p.pts.geometry.dispose(); p.pts.material.dispose(); RT.parts.splice(i, 1); }
+  }
+  if (RT.follow && !RT.follow.a.dead) {
+    const { a, d } = RT.follow, p = a.mesh.position, yaw = a.mesh.rotation.y, k = 1 - Math.exp(-dt * 5);
+    if (is2D()) { tmpV.set(p.x, p.y + 1.5, 40); camera.position.lerp(tmpV, k); orbit.target.set(camera.position.x, camera.position.y, 0); }
+    else if (RT.view === 'first') { const f = a.fwd(); tmpV.set(p.x, p.y + 0.62, p.z).addScaledVector(f, 0.34); camera.position.copy(tmpV); orbit.target.copy(tmpV).add(f); }
+    else {
+      if (RT.view === 'top') tmpV.set(p.x, p.y + d * 1.6, p.z + 0.01); else if (RT.view === 'side') tmpV.set(p.x + d, p.y + d * 0.3, p.z);
+      else tmpV.set(p.x + Math.sin(yaw) * d, p.y + d * 0.45 + 1, p.z + Math.cos(yaw) * d);
+      camera.position.lerp(tmpV, k); orbit.target.lerp(tmpV.set(p.x, p.y + 0.8, p.z), 1 - Math.exp(-dt * 10));
+    }
+    camera.lookAt(orbit.target); orbit.enabled = false;
+  } else { orbit.enabled = !tc.dragging; orbit.update(); }
+  let shook = null;
+  if (RT.shake > 0) { shook = camera.position.clone(); camera.position.add(tmpV.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(RT.shake)); RT.shake = Math.max(0, RT.shake - dt * 1.5); }
+  renderer.render(scene, camera);
+  if (shook) camera.position.copy(shook);
+  if (RT.running) {
+    const r = stageEl.getBoundingClientRect();
+    for (const a of RT.actors) {
+      if (!a.bubble) continue;
+      const b = boxOf(a); const top = tmpV.set((b.min.x + b.max.x) / 2, b.max.y + 0.15, (b.min.z + b.max.z) / 2).project(camera);
+      a.bubble.hidden = !a.mesh.visible || top.z > 1;
+      a.bubble.style.transform = `translate(${(top.x + 1) / 2 * r.width}px, ${(1 - top.y) / 2 * r.height}px) translate(-50%, calc(-100% - 8px))`;
+    }
+  }
+}
+
+/* ---------------- persistence ---------------- */
+const LS = 'blocksphere3d.project.v1';
+let saveT = 0;
+function scheduleSave() { clearTimeout(saveT); saveT = setTimeout(saveNow, 600); }
+function serialize() { saveWs(); project.name = $('#projName').value; project.selected = currentId; return JSON.stringify({ app: 'blocksphere3d', version: 1, ...project, objects: project.objects.map(({ prog, ...o }) => o) }); }
+function saveNow() { if (!project) return; try { localStorage.setItem(LS, serialize()); } catch (e) { } renderListSoon(); }
+let rlT = 0; function renderListSoon() { clearTimeout(rlT); rlT = setTimeout(renderList, 50); }
+$('#projName').addEventListener('change', scheduleSave);
+
+function loadProject(p) {
+  if (RT.running) stopGame();
+  tc.detach();
+  for (const m of meshes.values()) { scene.remove(m); m.material.dispose(); }
+  meshes.clear();
+  project = { mode: p.mode === '2d' ? '2d' : '3d', name: p.name || 'Мой проект', objects: (p.objects || []).map(o => ({ rot: [0, 0, 0], scale: [1, 1, 1], ...o, shape: SHAPES[o.shape] ? o.shape : 'cube' })), vars: p.vars || [] };
+  for (const o of project.objects) for (const v of o.blocks?.variables || []) if (!project.vars.includes(v.name)) project.vars.push(v.name);
+  $('#projName').value = project.name;
+  for (const o of project.objects) meshes.set(o.id, makeMesh(o));
+  currentId = null;
+  select(project.objects.some(o => o.id === p.selected) ? p.selected : project.objects[0]?.id || null);
+  setMode(project.mode);
+  setTimeout(() => $('#zFit').onclick(), 30);
+}
+
+/* ---------------- example projects ---------------- */
+function B(type, fields, inputs, extraState) {
+  const b = { type }; if (fields) b.fields = fields; if (extraState) b.extraState = extraState;
+  if (inputs) { b.inputs = {}; for (const [k, v] of Object.entries(inputs)) b.inputs[k] = typeof v === 'number' ? { shadow: { type: 'math_number', fields: { NUM: v } } } : typeof v === 'string' ? { shadow: { type: 'text', fields: { TEXT: v } } } : Array.isArray(v) ? { block: chain(v) } : { block: v }; }
+  return b;
+}
+function chain(list) { for (let i = list.length - 2; i >= 0; i--) list[i].next = { block: list[i + 1] }; return list[0]; }
+const S = (x, y, list) => Object.assign(chain(list), { x, y });
+const WS = (vars, ...scripts) => ({ blocks: { languageVersion: 0, blocks: scripts }, variables: vars });
+const IF = (cond, body) => B('controls_if', null, { IF0: cond, DO0: body });
+const KEY = k => B('sn_key', { KEY: k });
+const VAR = id => B('variables_get', { VAR: { id } });
+const TIMER = () => B('sn_timer');
+const MUL = (a, b) => B('math_arithmetic', { OP: 'MULTIPLY' }, { A: a, B: b });
+const TRIG = (op, x) => B('math_trig', { OP: op }, { NUM: x });
+
+function exCoins() {
+  const sv = [{ name: 'монеты', id: 'v_coins' }];
+  return { name: 'Монетки', vars: ['монеты'], objects: [
+    { id: 'p1', name: 'Игрок', shape: 'hero', look: { skin: '#f1c19a', pants: '#2f3b5c', hair: '#4a2c17', hat: 'cap' }, color: '#3c7cf0', pos: [0, 0.73, 5], rot: [0, 0, 0], scale: [1, 1, 1], blocks: WS(sv,
+      S(20, 20, [B('ev_start'), B('ph_gravity', { ON: 'on' }), B('wd_follow', null, { N: 7 }), B('variables_set', { VAR: { id: 'v_coins' } }, { VALUE: 0 }),
+        B('wd_hud', null, { TEXT: 'Собери 8 монет · стрелки — ходить, пробел — прыжок' }),
+        B('ct_forever', null, { DO: [
+          IF(KEY('ArrowUp'), [B('mv_move', null, { N: 0.12 })]),
+          IF(KEY('ArrowDown'), [B('mv_move', null, { N: -0.08 })]),
+          IF(KEY('ArrowLeft'), [B('mv_rotate', { AX: 'y' }, { N: 4 })]),
+          IF(KEY('ArrowRight'), [B('mv_rotate', { AX: 'y' }, { N: -4 })]),
+          B('mv_bounce'),
+        ] })]),
+      S(20, 520, [B('ev_key', { KEY: 'space' }), IF(B('ph_onground'), [B('ph_jump', null, { N: 9 }), B('sd_fx', { FX: 'jump' })])]),
+      S(420, 520, [B('ev_click'), B('lk_wave'), B('lk_sayfor', null, { TEXT: 'Привет! Я собираю монеты', N: 2 })])) },
+    { id: 'c1', name: 'Монета', shape: 'coin', color: '#ffc531', pos: [3, 0.8, 0], rot: [0, 0, 0], scale: [1, 1, 1], blocks: WS(sv,
+      S(20, 20, [B('ev_start'), B('ph_solid', { ON: 'on' }), B('lk_glow', { ON: 'on' }), B('controls_repeat_ext', null, { TIMES: 7, DO: [B('ct_clone', { OBJ: '__self' })] }),
+        B('ct_forever', null, { DO: [B('mv_rotate', { AX: 'y' }, { N: 4 })] })]),
+      S(20, 300, [B('ev_clone'), B('mv_goto', { OBJ: '__random' }), B('ct_forever', null, { DO: [B('mv_rotate', { AX: 'y' }, { N: 4 })] })]),
+      S(380, 20, [B('ev_touch', { OBJ: 'Игрок' }), B('sd_fx', { FX: 'coin' }), B('math_change', { VAR: { id: 'v_coins' } }, { DELTA: 1 }), B('wd_boom', { C: '#ffc531' }),
+        B('wd_hud', null, { TEXT: B('text_join', null, { ADD0: 'Монеты: ', ADD1: VAR('v_coins'), ADD2: ' из 8' }, { itemCount: 3 }) }),
+        IF(B('logic_compare', { OP: 'EQ' }, { A: VAR('v_coins'), B: 8 }), [B('sd_fx', { FX: 'win' }), B('wd_hud', null, { TEXT: 'Победа! Все монеты собраны' }), B('ev_broadcast', { MSG: 'победа' })]),
+        B('lk_hide'), B('ct_delclone')])) },
+    { id: 'l1', name: 'Лифт', shape: 'platform', color: '#ff7a45', pos: [-6, 0.4, -3], rot: [0, 0, 0], scale: [1, 1, 1], blocks: WS([],
+      S(20, 20, [B('ev_start'), B('ct_forever', null, { DO: [B('mv_glide', null, { T: 2.5, X: -6, Y: 4, Z: -3 }), B('ct_wait', null, { N: 1 }), B('mv_glide', null, { T: 2.5, X: -6, Y: 0.4, Z: -3 }), B('ct_wait', null, { N: 1 })] })])) },
+    { id: 'b1', name: 'Башня', shape: 'cube', color: '#8f5bea', pos: [-1, 2, -8], rot: [0, 0, 0], scale: [3, 4, 3], blocks: WS([],
+      S(20, 20, [B('ev_msg', { MSG: 'победа' }), B('lk_glow', { ON: 'on' }), B('controls_repeat_ext', null, { TIMES: 12, DO: [B('lk_colorrand'), B('ct_wait', null, { N: 0.15 })] })])) },
+    { id: 'b2', name: 'Ящик', shape: 'cube', color: '#c98b4a', pos: [3, 0.5, -3], rot: [0, 20, 0], scale: [1, 1, 1], blocks: null },
+  ], selected: 'p1' };
+}
+function exJump() {
+  const start = () => [B('mv_setpos', null, { X: -10, Y: 2, Z: 0 }), B('ph_vel', null, { X: 0, Y: 0, Z: 0 })];
+  const plat = (id, name, x, y, color, script) => ({ id, name, shape: 'platform', color, pos: [x, y, 0], rot: [0, 0, 0], scale: [1, 1, 1], blocks: script ? WS([], script) : null });
+  return { name: 'Прыгун 2D', mode: '2d', vars: [], objects: [
+    { id: 'h1', name: 'Герой', shape: 'hero', look: { skin: '#e9b48a', pants: '#3b2f5c', hair: '#2a1a0f', hat: 'party' }, color: '#2ecf7b', pos: [-10, 0.73, 0], rot: [0, 0, 0], scale: [1, 1, 1], blocks: WS([],
+      S(20, 20, [B('ev_start'), B('ph_gravity', { ON: 'on' }), B('wd_follow', null, { N: 6 }), B('wd_hud', null, { TEXT: 'Доберись до флага! ← → ходить, пробел — прыжок' }),
+        B('ct_forever', null, { DO: [IF(KEY('ArrowLeft'), [B('mv_moveaxis', { AX: 'x' }, { N: -0.12 })]), IF(KEY('ArrowRight'), [B('mv_moveaxis', { AX: 'x' }, { N: 0.12 })])] })]),
+      S(20, 330, [B('ev_key', { KEY: 'space' }), IF(B('ph_onground'), [B('ph_jump', null, { N: 10 }), B('sd_fx', { FX: 'jump' })])]),
+      S(20, 480, [B('ev_msg', { MSG: 'ой' }), B('sd_fx', { FX: 'error' }), B('wd_shake'), ...start(), B('lk_sayfor', null, { TEXT: 'Ой! Ещё раз', N: 1 })]),
+      S(380, 480, [B('ev_msg', { MSG: 'финиш' }), B('lk_wave'), B('sd_melody', { M: 'win' }), B('wd_weather', { W: 'leaves' }), B('wd_hud', null, { TEXT: 'Победа! Ты добрался до флага' })])) },
+    plat('q1', 'Ступенька', -5, 1.2, '#c98b4a'),
+    plat('q2', 'Лифт', 0, 2, '#ff7a45', [S(20, 20, [B('ev_start'), B('ct_forever', null, { DO: [B('mv_glide', null, { T: 2, X: 0, Y: 4.5, Z: 0 }), B('mv_glide', null, { T: 2, X: 0, Y: 2, Z: 0 })] })])]),
+    plat('q3', 'Полка', 5, 3.5, '#c98b4a'),
+    plat('q4', 'Вершина', 10, 5, '#8f5bea'),
+    { id: 'sp', name: 'Шипы', shape: 'pyramid', color: '#e5484d', pos: [2.5, 0.5, 0], rot: [0, 0, 0], scale: [1.2, 1, 1], blocks: WS([],
+      S(20, 20, [B('ev_start'), B('ph_solid', { ON: 'on' })]), S(20, 160, [B('ev_touch', { OBJ: 'Герой' }), B('ev_broadcast', { MSG: 'ой' })])) },
+    { id: 'fl', name: 'Флаг', shape: 'cylinder', color: '#ffc531', pos: [10.5, 6.4, 0], rot: [0, 0, 0], scale: [0.15, 2.6, 0.15], blocks: WS([],
+      S(20, 20, [B('ev_start'), B('ph_solid', { ON: 'on' }), B('lk_glow', { ON: 'on' })]),
+      S(20, 160, [B('ev_touch', { OBJ: 'Герой' }), B('wd_boom', { C: '#ffc531' }), B('ev_broadcast', { MSG: 'финиш' })])) },
+  ], selected: 'h1' };
+}
+function exSpace() {
+  const orbit = (r, speed, rot) => [B('ev_start'), B('wd_trail', { ON: 'on' }), B('ct_forever', null, { DO: [
+    B('mv_setpos', null, { X: MUL(r, TRIG('COS', MUL(TIMER(), speed))), Y: 3, Z: MUL(r, TRIG('SIN', MUL(TIMER(), speed))) }), B('mv_rotate', { AX: 'y' }, { N: rot })] })];
+  return { name: 'Солнечная система', vars: [], objects: [
+    { id: 's1', name: 'Солнце', shape: 'sphere', color: '#ffc23d', pos: [0, 3, 0], rot: [0, 0, 0], scale: [2.6, 2.6, 2.6], blocks: WS([],
+      S(20, 20, [B('ev_start'), B('wd_time', { T: 'night' }), B('wd_floor', { ON: 'off' }), B('lk_glow', { ON: 'on' }), B('wd_campos', null, { X: 0, Y: 16, Z: 18 }),
+        B('wd_hud', null, { TEXT: 'Кликни по планете' }), B('ct_forever', null, { DO: [B('mv_rotate', { AX: 'y' }, { N: 0.5 })] })]),
+      S(20, 330, [B('ev_click'), B('sd_fx', { FX: 'pop' }), B('lk_sayfor', null, { TEXT: 'Я звезда. Мне 4,6 млрд лет', N: 3 })])) },
+    { id: 's2', name: 'Земля', shape: 'sphere', color: '#3c8cf0', pos: [6, 3, 0], rot: [0, 0, 0], scale: [0.8, 0.8, 0.8], blocks: WS([],
+      S(20, 20, orbit(6, 50, 3)), S(20, 330, [B('ev_click'), B('sd_speak', null, { TEXT: 'Земля' }), B('lk_sayfor', null, { TEXT: 'Третья планета от Солнца', N: 2 })])) },
+    { id: 's3', name: 'Луна', shape: 'sphere', color: '#cfd3dc', pos: [7.4, 3, 0], rot: [0, 0, 0], scale: [0.3, 0.3, 0.3], blocks: WS([],
+      S(20, 20, [B('ev_start'), B('ct_forever', null, { DO: [B('mv_goto', { OBJ: 'Земля' }), B('mv_moveaxis', { AX: 'x' }, { N: MUL(1.3, TRIG('COS', MUL(TIMER(), 400))) }),
+        B('mv_moveaxis', { AX: 'z' }, { N: MUL(1.3, TRIG('SIN', MUL(TIMER(), 400))) })] })])) },
+    { id: 's4', name: 'Марс', shape: 'sphere', color: '#e2603a', pos: [9.5, 3, 0], rot: [0, 0, 0], scale: [0.6, 0.6, 0.6], blocks: WS([],
+      S(20, 20, orbit(9.5, 27, 3)), S(20, 330, [B('ev_click'), B('lk_sayfor', null, { TEXT: 'Красная планета', N: 2 })])) },
+    { id: 's5', name: 'Сатурн', shape: 'sphere', color: '#e8c98a', pos: [13, 3, 0], rot: [0, 0, 0], scale: [1.3, 1.3, 1.3], blocks: WS([],
+      S(20, 20, orbit(13, 14, 2)), S(20, 330, [B('ev_click'), B('lk_sayfor', null, { TEXT: 'У меня есть кольца', N: 2 })])) },
+    { id: 's6', name: 'Кольцо', shape: 'torus', color: '#d8c9a8', pos: [13, 3, 0], rot: [75, 0, 0], scale: [3.4, 3.4, 0.4], blocks: WS([],
+      S(20, 20, [B('ev_start'), B('ct_forever', null, { DO: [B('mv_goto', { OBJ: 'Сатурн' })] })])) },
+  ], selected: 's2' };
+}
+function exMusic() {
+  const keys = [['A', 'a', 60, '#ff5a5f'], ['S', 's', 62, '#ff9f43'], ['D', 'd', 64, '#ffd43b'], ['F', 'f', 65, '#51cf66'], ['G', 'g', 67, '#22b8cf'], ['H', 'h', 69, '#5c7cfa'], ['J', 'j', 71, '#cc5de8'], ['K', 'k', 72, '#f06595']];
+  return { name: 'Пианино-кубы', vars: [], objects: keys.map(([L, k, n, c], i) => ({ id: 'k' + i, name: 'Клавиша ' + L, shape: 'cube', color: c, pos: [(i - 3.5) * 1.4, 0.5, 0], rot: [0, 0, 0], scale: [1.1, 1, 2.4], blocks: WS([],
+    S(20, 20, [B('ev_key', { KEY: k }), B('lk_glow', { ON: 'on' }), B('mv_moveaxis', { AX: 'y' }, { N: 0.4 }), B('sd_note', null, { N: n, T: 0.35 }), B('mv_moveaxis', { AX: 'y' }, { N: -0.4 }), B('lk_glow', { ON: 'off' })]),
+    S(20, 260, [B('ev_click'), B('lk_glow', { ON: 'on' }), B('sd_note', null, { N: n, T: 0.35 }), B('lk_glow', { ON: 'off' })]),
+    ...(i === 0 ? [S(20, 420, [B('ev_start'), B('wd_time', { T: 'sunset' }), B('wd_hud', null, { TEXT: 'Играй клавишами A S D F G H J K или кликай по кубам' }), B('wd_campos', null, { X: 0, Y: 7, Z: 9 })])] : []),
+  ) })), selected: 'k0' };
+}
+
+/* project menu */
+const menu = $('#projMenu');
+$('#projBtn').onclick = e => { e.stopPropagation(); menu.hidden = !menu.hidden; };
+addEventListener('click', e => { if (!menu.hidden && !menu.contains(e.target)) menu.hidden = true; });
+menu.addEventListener('click', async e => {
+  const act = e.target.closest('button')?.dataset.act; if (!act) return; menu.hidden = true;
+  if (act === 'copy') {
+    const txt = serialize();
+    try { await navigator.clipboard.writeText(txt); toast('Проект скопирован. Вставь его в заметку или файл, чтобы сохранить.'); }
+    catch { dialog({ title: 'Скопируй текст проекта', text: 'Выдели всё и скопируй (Ctrl+C).', area: txt, cancel: null, ok: 'Готово' }); setTimeout(() => $('#dlgArea').select(), 50); }
+    return;
+  }
+  if (act === 'open') { $('#fileIn').click(); return; }
+  if (act === 'paste') {
+    const t = await dialog({ title: 'Вставить проект', text: 'Вставь текст проекта, скопированный кнопкой «Скопировать проект».', area: '', ok: 'Открыть' });
+    if (t) openText(t); return;
+  }
+  if (!(await dialog({ title: 'Открыть другой проект?', text: 'Текущий проект будет заменён. Если он нужен — сначала скопируй его.', ok: 'Открыть' }))) return;
+  if (act === 'new') { const o = newObj('cube', { name: 'Куб', color: '#3c7cf0', pos: [0, 0.5, 0] }); loadProject({ name: 'Новый проект', objects: [o] }); }
+  if (act === 'ex-coins') loadProject(exCoins());
+  if (act === 'ex-jump') loadProject(exJump());
+  if (act === 'ex-space') loadProject(exSpace());
+  if (act === 'ex-music') loadProject(exMusic());
+  saveNow();
+});
+function openText(t) {
+  try { const p = JSON.parse(t); if (!Array.isArray(p.objects)) throw new Error('нет списка объектов'); loadProject(p); saveNow(); toast('Проект открыт'); }
+  catch (e) { toast('Это не похоже на проект Блоксферы: ' + e.message, true); }
+}
+$('#fileIn').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => openText(r.result); r.readAsText(f); e.target.value = ''; });
+
+/* ---------------- block search ---------------- */
+const NAMES = Object.fromEntries(defs.map(d => [d.type, (d.message0.replace(/%\d/g, ' ') + ' ' + (d.tooltip || '') + ' ' + (d.args0 || []).flatMap(a => Array.isArray(a.options) ? a.options.map(o => o[0]) : []).join(' '))]));
+Object.assign(NAMES, { controls_repeat_ext: 'повторить раз цикл', controls_if: 'если иначе условие', controls_whileUntil: 'повторять пока цикл', controls_for: 'для от до счётчик цикл',
+  controls_flow_statements: 'прервать цикл выйти', math_arithmetic: 'плюс минус умножить делить сложить арифметика', math_random_int: 'случайное число рандом', logic_compare: 'сравнить равно больше меньше',
+  logic_operation: 'и или', logic_negate: 'не', logic_boolean: 'истина ложь', math_modulo: 'остаток деления', math_round: 'округлить', math_single: 'корень модуль', math_trig: 'синус косинус sin cos',
+  math_number: 'число', text: 'текст строка', text_join: 'склеить соединить текст', text_length: 'длина текста', lists_create_with: 'список создать', lists_length: 'длина списка',
+  lists_getIndex: 'элемент списка взять', lists_setIndex: 'вставить заменить список' });
+const allEntries = toolbox.contents.filter(c => c.contents).flatMap(c => c.contents);
+$('#blockSearch').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase(), tbx = ws.getToolbox(), fly = tbx.getFlyout();
+  if (!q) { fly.hide(); return; }
+  tbx.clearSelection?.();
+  const found = allEntries.filter(en => (NAMES[en.type] || '').toLowerCase().includes(q));
+  fly.show(found.length ? found : [{ kind: 'label', text: 'Ничего не найдено. Попробуй другое слово' }]);
+});
+$('#blockSearch').addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; ws.getToolbox().getFlyout().hide(); } });
+
+/* ---------------- help ---------------- */
+const HELP = `1. Справа выбери объект. Его скрипты появятся слева.
+2. Открой раздел блоков (События, Движение…) и перетащи блоки на поле. Блоки защёлкиваются друг под друга.
+3. Каждый скрипт начинается с жёлтого блока «когда…».
+4. Нажми ▶ Старт. ■ Стоп возвращает всё на свои места.
+5. Не можешь найти блок? Напиши в поиске: «прыг», «звук», «камера».
+6. 3D / 2D вверху — объёмный мир или плоский вид сбоку.
+7. «☺ Персонаж» в «Добавить» — свой человечек. Ему можно выбрать кожу, кофту, штаны и шапку, а он сам шагает и машет рукой.
+8. Объекты на сцене можно тянуть мышкой: Двигать, Вращать, Размер.
+9. Перетащи скрипт на другой объект в списке — он скопируется.
+Горячие клавиши: Ctrl+Enter — старт, Esc — стоп, Ctrl+Z — отменить.`;
+$('#helpBtn').onclick = () => dialog({ title: 'Как пользоваться Блоксферой', text: HELP, cancel: null, ok: 'Понятно' });
+
+/* ---------------- boot ---------------- */
+let saved = null;
+try { saved = JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) { }
+loadProject(saved && Array.isArray(saved.objects) && saved.objects.length ? saved : exCoins());
+resize(); frame();
+try { if (!localStorage.getItem('blocksphere3d.help')) { localStorage.setItem('blocksphere3d.help', '1'); $('#helpBtn').onclick(); } } catch (e) { $('#helpBtn').onclick(); }
+addEventListener('error', e => console.error(e.error || e.message));
+</script>
+</body>
+</html>
