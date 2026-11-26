@@ -108,6 +108,35 @@ button{cursor:pointer}
 .props input,.props select{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0;width:100%;box-sizing:border-box;font-variant-numeric:tabular-nums}
 .props input[type=color]{padding:2px;height:32px}
 
+/* AI assistant */
+.btn.ai{background:var(--accent);border-color:var(--accent);color:#1a1300;font-weight:800}
+.btn.ai:hover{filter:brightness(1.06);background:var(--accent)}
+#aiPanel{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--panel);border-left:1px solid var(--line);z-index:60;display:flex;flex-direction:column;box-shadow:-20px 0 40px rgba(0,0,0,.45);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+.ai-head{display:flex;align-items:center;gap:8px;padding:14px 16px 6px}
+.ai-head h2{font-family:var(--f-display);font-size:15px;font-weight:600;margin:0;flex:1}
+#aiStatus{font-size:12.5px;color:var(--muted);padding:0 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+#aiStatus .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
+#aiStatus.ok .dot{background:var(--run)} #aiStatus.bad .dot{background:var(--stop)}
+#aiLog{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.msg{padding:10px 12px;border-radius:12px;line-height:1.5;white-space:pre-wrap;max-width:92%;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:var(--blue);color:#fff}
+.msg.bot{align-self:flex-start;background:var(--panel-2);border:1px solid var(--line)}
+.msg.thinking{color:var(--muted)}
+.msg .acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 10px}
+.chip{background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-size:12.5px;font-weight:700;text-align:left}
+.chip:hover{border-color:var(--accent)}
+.ai-form{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);align-items:flex-end}
+#aiInput{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;resize:none;height:64px;line-height:1.4}
+.welcome{width:min(620px,100%)}
+.wel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.wel-grid button{background:var(--panel-2);border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:left;display:flex;flex-direction:column;gap:5px;min-width:0}
+.wel-grid button:hover{border-color:var(--accent)}
+.wel-grid b{font-family:var(--f-display);font-weight:600;font-size:14px}
+.wel-grid span{color:var(--muted);font-size:13px;line-height:1.45}
+.wel-grid button.main{border-color:var(--accent)}
+@media (max-width:520px){.wel-grid{grid-template-columns:minmax(0,1fr)}}
+
 /* modal + toasts */
 .modal{position:fixed;inset:0;background:rgba(5,7,16,.6);display:grid;place-items:center;z-index:100;padding:16px}
 .dlg{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;width:min(440px,100%);display:flex;flex-direction:column;gap:12px;box-shadow:0 30px 60px rgba(0,0,0,.5)}
@@ -140,6 +169,7 @@ button{cursor:pointer}
   .props .w3,.props .w2{grid-column:span 3}
   #projName{width:130px}
 }
+@media (max-width:640px){ #aiBtn .lbl{display:none} }
 @media (max-width:520px){ .tools .wide{display:none} .brand span.long{display:none} .code-tag{display:none} }
 </style>
 </head>
@@ -161,15 +191,20 @@ button{cursor:pointer}
       <button class="btn sm wide" id="undoBtn" title="Отменить (Ctrl+Z)">↶</button>
       <button class="btn sm wide" id="redoBtn" title="Повторить (Ctrl+Shift+Z)">↷</button>
       <button class="btn sm wide" id="tidyBtn" title="Выстроить скрипты аккуратно">Упорядочить</button>
+      <button class="btn sm ai" id="aiBtn" title="ИИ соберёт игру за тебя">✨<span class="lbl"> ИИ-помощник</span></button>
       <button class="btn sm" id="helpBtn" title="Как пользоваться">? Помощь</button>
       <div class="menu">
         <button class="btn sm" id="projBtn" aria-haspopup="true">Проект ▾</button>
         <div class="dropdown" id="projMenu" hidden>
           <button data-act="new">Новый пустой проект</button>
+          <button data-act="ex-robot">Пример: Говорящий робот<small>ИИ-персонаж отвечает на вопросы</small></button>
           <button data-act="ex-jump">Пример: Прыгун 2D<small>персонаж, платформы, шипы, флаг</small></button>
           <button data-act="ex-coins">Пример: Монетки<small>платформер, физика, копии, счёт</small></button>
           <button data-act="ex-space">Пример: Солнечная система<small>орбиты, следы, ночь</small></button>
           <button data-act="ex-music">Пример: Пианино-кубы<small>клавиши, ноты, свечение</small></button>
+          <hr>
+          <button data-act="key">Ключ ИИ…<small>нужен для ИИ на сайте GitHub</small></button>
+          <button data-act="welcome">Стартовый экран</button>
           <hr>
           <button data-act="open">Открыть файл .json…</button>
           <button data-act="paste">Вставить проект из текста…</button>
@@ -249,6 +284,31 @@ button{cursor:pointer}
     <textarea id="dlgArea" spellcheck="false"></textarea>
     <div class="dlg-actions"><button type="button" class="btn" id="dlgCancel">Отмена</button><button type="submit" class="btn run" id="dlgOk">OK</button></div>
   </form>
+</div>
+<aside id="aiPanel" hidden aria-label="ИИ-помощник">
+  <div class="ai-head"><h2>✨ ИИ-помощник</h2><button class="btn sm" id="aiKeyBtn">Ключ</button><button class="btn sm" id="aiClose" aria-label="Закрыть">✕</button></div>
+  <div id="aiStatus"><span class="dot"></span><span id="aiStatusText">Проверяю подключение…</span></div>
+  <div id="aiLog"><div class="msg bot">Привет! Я собираю игры из блоков. Напиши, какую игру хочешь, или что поменять в этой. Например: «сделай гонку, где машина объезжает конусы».</div></div>
+  <div class="chips" id="aiChips">
+    <button class="chip">Сделай 2D-платформер про кота, который собирает рыбу</button>
+    <button class="chip">Добавь врага, который бегает за игроком</button>
+    <button class="chip">Сделай игру-викторину с говорящим ИИ-роботом</button>
+    <button class="chip">Объясни, как работает мой проект</button>
+  </div>
+  <form class="ai-form" id="aiForm"><textarea id="aiInput" placeholder="Какую игру сделать?"></textarea>
+    <div style="display:flex;flex-direction:column;gap:6px"><button class="btn run" id="aiSend" type="submit">Отправить</button><button class="btn sm stop" id="aiStop" type="button" hidden>Стоп</button></div></form>
+</aside>
+<div class="modal" id="welcome" hidden>
+  <div class="dlg welcome">
+    <h3>Привет! Это Блоксфера 3D</h3>
+    <p>Здесь игры собирают из цветных блоков, как из конструктора. С чего начнём?</p>
+    <div class="wel-grid">
+      <button data-w="example" class="main"><b>▶ Сыграть в пример</b><span>Откроем игру «Монетки» и сразу запустим. Стрелки — ходить, пробел — прыжок.</span></button>
+      <button data-w="ai"><b>✨ Попросить ИИ</b><span>Напиши словами, какую игру хочешь, и ИИ соберёт её из блоков.</span></button>
+      <button data-w="empty"><b>□ Начать с нуля</b><span>Пустой мир и твой персонаж. Собирай всё сам.</span></button>
+      <button data-w="help"><b>? Как это работает</b><span>Короткая инструкция на одну минуту.</span></button>
+    </div>
+  </div>
 </div>
 <input type="file" id="fileIn" accept=".json,application/json" hidden>
 <div id="toasts"></div>
@@ -580,6 +640,14 @@ def('wd_boom', 'взрыв частиц %1', [{ type: 'field_colour', name: 'C',
 def('wd_hud', 'надпись на экране %1', [V('TEXT')], 's', C.wd);
 def('wd_trail', 'оставлять след %1', [DD('ON', ONOFF)], 's', C.wd, 'Объект рисует линию там, где движется.');
 def('wd_cleartrails', 'стереть все следы', [], 's', C.wd);
+// AI
+C.ai = '#0E9F8E';
+def('ai_role', 'ИИ: мой характер %1', [V('TEXT')], 's', C.ai, 'Кем этот объект будет в разговоре с ИИ: имя, характер, что он знает.');
+def('ai_chat', 'ИИ: ответить на %1 и сказать', [V('TEXT')], 's', C.ai, 'ИИ придумывает ответ и объект говорит его. Помнит разговор.');
+def('ai_ask', 'ИИ: ответ на %1', [V('TEXT')], 'a', C.ai, 'Спросить ИИ и получить текст ответа.');
+def('ai_number', 'ИИ: число по запросу %1', [V('TEXT')], 'n', C.ai, 'ИИ отвечает числом. Например: «насколько вежлив этот ответ от 1 до 10».');
+def('ai_answer', 'последний ответ ИИ', [], 'a', C.ai);
+def('ai_forget', 'ИИ: забыть разговор', [], 's', C.ai);
 Blockly.common.defineBlocksWithJsonArray(defs);
 const HATS = { ev_start: null, ev_key: 'KEY', ev_click: null, ev_touch: 'OBJ', ev_msg: 'MSG', ev_timer: 'SEC', ev_clone: null };
 
@@ -604,6 +672,8 @@ const toolbox = { kind: 'categoryToolbox', contents: [
     tb('math_modulo', { DIVIDEND: 10, DIVISOR: 3 }), tb('math_round', { NUM: 3.7 }), tb('math_single', { NUM: 9 }), tb('math_trig', { NUM: 45 }), tb('math_number'),
     tb('text', null, { TEXT: 'текст' }), tb('text_join', { ADD0: 'Счёт: ', ADD1: '0' }, null, { itemCount: 2 }), tb('text_length', { VALUE: 'абв' })]),
   cat('Списки', C.ls, [tb('lists_create_with', null, null, { itemCount: 0 }), tb('lists_create_with', { ADD0: 1, ADD1: 2, ADD2: 3 }, null, { itemCount: 3 }), tb('lists_length'), tb('lists_getIndex', { AT: 1 }), tb('lists_setIndex', { AT: 1 })]),
+  cat('ИИ', C.ai, [tb('ai_role', { TEXT: 'Ты — весёлый робот Бип. Любишь загадки.' }), tb('ai_chat', { TEXT: 'Привет! Кто ты?' }), tb('ai_ask', { TEXT: 'Придумай имя для дракона' }),
+    tb('ai_number', { TEXT: 'Случайное число от 1 до 10' }), tb('ai_answer'), tb('ai_forget')]),
   { kind: 'sep' },
   { kind: 'category', name: 'Переменные', colour: C.vr, custom: 'VARIABLE' },
   { kind: 'category', name: 'Функции', colour: C.fn, custom: 'PROCEDURE' },
@@ -1125,6 +1195,7 @@ function startGame() {
   if (RT.running) stopGame();
   saveWs(); saveNow();
   RT.savedCam = { pos: camera.position.clone(), target: orbit.target.clone() };
+  RT.aiCtl?.abort(); RT.aiCtl = new AbortController(); RT.aiCount = 0; RT.aiWarned = false; RT.aiAnswer = '';
   RT.gen++; RT.running = true; RT.vars = {}; RT.t0 = performance.now(); RT.g = 20; RT.follow = null; RT.answer = ''; RT.keys.clear();
   for (const n of project.vars) RT.vars[n] = 0;
   resetWorld(); tc.detach(); RT.view = 'back';
@@ -1137,7 +1208,7 @@ function startGame() {
 }
 function stopGame() {
   if (!RT.running) return;
-  RT.running = false; RT.gen++;
+  RT.running = false; RT.gen++; RT.aiCtl?.abort();
   const w = RT.waiters; RT.waiters = []; w.forEach(r => r());
   for (const a of RT.actors) { a.say(''); if (a.isClone) a.remove(); }
   RT.actors = []; RT.follow = null; RT.keys.clear();
@@ -1368,6 +1439,16 @@ function exCoins() {
     { id: 'b2', name: 'Ящик', shape: 'cube', color: '#c98b4a', pos: [3, 0.5, -3], rot: [0, 20, 0], scale: [1, 1, 1], blocks: null },
   ], selected: 'p1' };
 }
+function exRobot() {
+  return { name: 'Говорящий робот', mode: '3d', vars: [], objects: [
+    { id: 'r1', name: 'Робот Бип', shape: 'hero', look: { skin: '#c7d0de', pants: '#3a4256', hair: '#222', hat: 'crown' }, color: '#7f8ca8', pos: [0, 1.02, 0], rot: [0, 0, 0], scale: [1.4, 1.4, 1.4], blocks: WS([],
+      S(20, 20, [B('ev_start'), B('ai_role', null, { TEXT: 'Ты — весёлый робот Бип. Живёшь в 3D-мире Блоксферы, любишь шутить и загадывать загадки.' }),
+        B('wd_campos', null, { X: 0, Y: 3, Z: 6 }), B('wd_hud', null, { TEXT: 'Кликни по роботу и задай ему вопрос' }), B('lk_wave')]),
+      S(20, 300, [B('ev_click'), B('sn_ask', null, { TEXT: 'Что спросишь у робота?' }), B('ai_chat', null, { TEXT: B('sn_answer') }), B('sd_speak', null, { TEXT: B('ai_answer') }), B('lk_wave')])) },
+    { id: 'r2', name: 'Цветок', shape: 'cone', color: '#ff5aa5', pos: [2.2, 0.5, -1], rot: [0, 0, 0], scale: [0.6, 1, 0.6], blocks: null },
+    { id: 'r3', name: 'Камень', shape: 'sphere', color: '#9aa3b5', pos: [-2.4, 0.35, -0.5], rot: [0, 0, 0], scale: [1, 0.7, 1], blocks: null },
+  ], selected: 'r1' };
+}
 function exJump() {
   const start = () => [B('mv_setpos', null, { X: -10, Y: 2, Z: 0 }), B('ph_vel', null, { X: 0, Y: 0, Z: 0 })];
   const plat = (id, name, x, y, color, script) => ({ id, name, shape: 'platform', color, pos: [x, y, 0], rot: [0, 0, 0], scale: [1, 1, 1], blocks: script ? WS([], script) : null });
@@ -1432,6 +1513,8 @@ menu.addEventListener('click', async e => {
     return;
   }
   if (act === 'open') { $('#fileIn').click(); return; }
+  if (act === 'key') { keyDialog(); return; }
+  if (act === 'welcome') { showWelcome(); return; }
   if (act === 'paste') {
     const t = await dialog({ title: 'Вставить проект', text: 'Вставь текст проекта, скопированный кнопкой «Скопировать проект».', area: '', ok: 'Открыть' });
     if (t) openText(t); return;
@@ -1440,6 +1523,7 @@ menu.addEventListener('click', async e => {
   if (act === 'new') { const o = newObj('cube', { name: 'Куб', color: '#3c7cf0', pos: [0, 0.5, 0] }); loadProject({ name: 'Новый проект', objects: [o] }); }
   if (act === 'ex-coins') loadProject(exCoins());
   if (act === 'ex-jump') loadProject(exJump());
+  if (act === 'ex-robot') loadProject(exRobot());
   if (act === 'ex-space') loadProject(exSpace());
   if (act === 'ex-music') loadProject(exMusic());
   saveNow();
@@ -1449,6 +1533,268 @@ function openText(t) {
   catch (e) { toast('Это не похоже на проект Блоксферы: ' + e.message, true); }
 }
 $('#fileIn').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => openText(r.result); r.readAsText(f); e.target.value = ''; });
+
+/* ---------------- AI: connection ---------------- */
+const KEY_LS = 'blocksphere3d.anthropicKey';
+const AI = {
+  sample: null,
+  key() { try { return localStorage.getItem(KEY_LS) || ''; } catch (e) { return ''; } },
+  setKey(k) { try { k ? localStorage.setItem(KEY_LS, k) : localStorage.removeItem(KEY_LS); } catch (e) { } },
+  async init() { try { this.sample = (await window.claude?.use?.('sample')) || null; } catch (e) { this.sample = null; } updateAiStatus(); },
+  mode() { return this.sample ? 'claude' : this.key() ? 'key' : 'none'; },
+  async chat({ system, turns, effort = 'low', json = false, onText, signal }) {
+    if (this.sample) {
+      const input = [{ role: 'user', content: system }, ...turns];
+      const opts = { modelTier: json ? 'default' : 'quick', effort, cache: false, signal, ...(onText ? { onText: u => onText(u.text) } : {}) };
+      if (json) return await this.sample.json(input, opts);
+      return (await this.sample(input, opts)).text;
+    }
+    if (this.key()) {
+      const { default: Anthropic } = await import('./anthropic-sdk.mjs');
+      const client = new Anthropic({ apiKey: this.key(), dangerouslyAllowBrowser: true });
+      const stream = client.beta.messages.stream({
+        model: 'claude-opus-5-5', max_tokens: json ? 32000 : 1024, system, messages: turns,
+        output_config: { effort }, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
+      }, { signal });
+      if (onText) stream.on('text', (_d, snap) => onText(snap));
+      const msg = await stream.finalMessage();
+      if (msg.stop_reason === 'refusal') throw { code: 'refused' };
+      const text = msg.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      return json ? parseJson(text) : text;
+    }
+    throw { code: 'need_key' };
+  },
+};
+function parseJson(t) {
+  try { return JSON.parse(t); } catch (e) { }
+  const f = t.match(/```(?:json)?\s*([\s\S]*?)```/); if (f) { try { return JSON.parse(f[1]); } catch (e) { } }
+  const a = t.indexOf('{'), b = t.lastIndexOf('}'); if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { } }
+  throw { code: 'invalid_json' };
+}
+function aiErrText(e) {
+  const c = e?.code, st = e?.status;
+  if (c === 'cancelled' || e?.name === 'APIUserAbortError' || e?.name === 'AbortError') return 'Остановлено.';
+  if (c === 'need_key') return 'Нужен ключ ИИ. Нажми «Ключ» вверху этой панели.';
+  if (c === 'not_granted') return 'ИИ не разрешён для этой страницы. Разреши его в окне Claude, когда оно появится.';
+  if (c === 'sampling_disabled') return 'ИИ недоступен для этого аккаунта.';
+  if (c === 'rate_limited' || st === 429) return 'Слишком много запросов. Подожди минутку и попробуй ещё раз.';
+  if (c === 'refused') return 'ИИ отказался это делать. Попробуй попросить по-другому.';
+  if (c === 'invalid_json') return 'ИИ ответил непонятно. Попробуй ещё раз или попроси проще.';
+  if (st === 401) return 'Ключ ИИ не подошёл. Проверь его: Проект → Ключ ИИ.';
+  if (st === 400) return 'ИИ не принял запрос: ' + (e?.error?.error?.message || e?.message || '');
+  if (e instanceof TypeError) return 'Не получилось связаться с ИИ. Проверь интернет.';
+  return 'ИИ не ответил: ' + (e?.message || c || 'неизвестная ошибка');
+}
+function updateAiStatus() {
+  const m = AI.mode(), el = $('#aiStatus');
+  el.className = m === 'none' ? 'bad' : 'ok';
+  $('#aiStatusText').textContent = m === 'claude' ? 'Подключено через твой аккаунт Claude. Ключ не нужен.' : m === 'key' ? 'Подключено по твоему ключу Anthropic API.' : 'Нужен ключ ИИ: нажми «Ключ».';
+}
+async function keyDialog() {
+  const inp = $('#dlgInput'); inp.type = 'password';
+  const v = await dialog({ title: 'Ключ ИИ (Anthropic API)', ok: 'Сохранить', input: AI.key(), text:
+    (AI.sample ? 'Здесь, внутри Claude, ключ не нужен: ИИ уже работает через твой аккаунт. Ключ пригодится на сайте GitHub.\n\n' : '') +
+    'Ключ создают на сайте platform.claude.com в разделе API Keys. Запросы к ИИ оплачиваются с этого ключа.\n\nКлюч хранится только в этом браузере и отправляется только в Anthropic. Никому его не показывай. Оставь поле пустым, чтобы удалить ключ.' });
+  inp.type = 'text';
+  if (v === null) return;
+  AI.setKey(v.trim()); updateAiStatus(); toast(v.trim() ? 'Ключ сохранён' : 'Ключ удалён');
+}
+
+/* ---------------- AI: blocks in games ---------------- */
+let aiChain = Promise.resolve();
+const aiQueue = fn => { const p = aiChain.then(fn, fn); aiChain = p.catch(() => { }); return p; };
+async function gameAI(a, text, json = false) {
+  if (AI.mode() === 'none') { if (!RT.aiWarned) { RT.aiWarned = true; toast('ИИ-блокам нужен ключ: Проект → Ключ ИИ', true); } return json ? 0 : ''; }
+  if (++RT.aiCount > 40) { if (RT.aiCount === 41) toast('За одну игру можно задать ИИ до 40 вопросов', true); return json ? 0 : ''; }
+  const gen = RT.gen, signal = RT.aiCtl.signal;
+  const system = `Ты — «${a.name}», персонаж детской игры «${project.name}». ${a.aiRole || 'Ты дружелюбный персонаж.'}
+Отвечай по-русски, коротко: одно-два предложения, без разметки. Игра детская: будь добрым и безопасным.` + (json ? '\nОтветь ТОЛЬКО JSON вида {"n": число}.' : '');
+  const turns = json ? [{ role: 'user', content: String(text) }] : [...(a.aiHist || []).slice(-10), { role: 'user', content: String(text) }];
+  try {
+    const out = await aiQueue(() => { if (gen !== RT.gen) throw HALT; return AI.chat({ system, turns, effort: 'low', json, signal }); });
+    a.check();
+    if (json) return toNum(out && typeof out === 'object' ? out.n : out);
+    a.aiHist = [...turns, { role: 'assistant', content: out }]; RT.aiAnswer = out; return out;
+  } catch (e) {
+    if (e === HALT || gen !== RT.gen) throw HALT;
+    toast(aiErrText(e), true); return json ? 0 : '';
+  }
+}
+Object.assign(EX, {
+  async ai_role(b, a) { a.aiRole = await this.str(b, 'TEXT'); },
+  async ai_chat(b, a) { const q = await this.str(b, 'TEXT'); a.say('…'); const t = await gameAI(a, q); a.say(t); },
+  ai_forget(b, a) { a.aiHist = []; },
+});
+Object.assign(EV, {
+  async ai_ask(b, a) { return await gameAI(a, await this.str(b, 'TEXT')); },
+  async ai_number(b, a) { return await gameAI(a, await this.str(b, 'TEXT'), true); },
+  ai_answer: () => RT.aiAnswer || '',
+});
+
+/* ---------------- AI: assistant (compact project format) ---------------- */
+const BUILTIN_FIELDS = { controls_whileUntil: ['MODE'], controls_for: ['VAR'], controls_forEach: ['VAR'], controls_flow_statements: ['FLOW'], math_arithmetic: ['OP'], logic_compare: ['OP'],
+  logic_operation: ['OP'], logic_boolean: ['BOOL'], math_single: ['OP'], math_trig: ['OP'], math_round: ['OP'], math_number: ['NUM'], text: ['TEXT'], variables_get: ['VAR'],
+  variables_set: ['VAR'], math_change: ['VAR'], lists_getIndex: ['MODE', 'WHERE'], lists_setIndex: ['MODE', 'WHERE'] };
+const DEF_BY = Object.fromEntries(defs.map(d => [d.type, d]));
+const fieldNames = t => DEF_BY[t] ? (DEF_BY[t].args0 || []).filter(a => a.type.startsWith('field_')).map(a => a.name) : (BUILTIN_FIELDS[t] || []);
+const ASSIST_BLOCKS = new Set([...defs.map(d => d.type), 'controls_repeat_ext', 'controls_whileUntil', 'controls_if', 'controls_for', 'controls_flow_statements', 'math_arithmetic', 'math_random_int',
+  'math_round', 'math_modulo', 'math_trig', 'math_single', 'logic_compare', 'logic_operation', 'logic_negate', 'logic_boolean', 'text', 'text_join', 'text_length', 'math_number',
+  'variables_set', 'variables_get', 'math_change', 'lists_create_with', 'lists_length', 'lists_getIndex', 'lists_setIndex']);
+let skipped = 0;
+function stepToBlock(st, varId) {
+  if (Array.isArray(st)) return chainSteps(st, varId);
+  if (!st || typeof st !== 'object' || !st.block) return null;
+  const type = String(st.block);
+  if (!ASSIST_BLOCKS.has(type)) { skipped++; return null; }
+  const b = { type }, fn = fieldNames(type); let maxIf = -1, maxAdd = -1;
+  for (const [k, v] of Object.entries(st)) {
+    if (k === 'block') continue;
+    if (fn.includes(k)) { (b.fields ||= {})[k] = k === 'VAR' ? { id: varId(String(v)) } : (typeof v === 'number' ? v : String(v)); continue; }
+    let m; if ((m = k.match(/^IF(\d+)$/))) maxIf = Math.max(maxIf, +m[1]); if ((m = k.match(/^ADD(\d+)$/))) maxAdd = Math.max(maxAdd, +m[1]);
+    let inp = null;
+    if (Array.isArray(v)) { const c = chainSteps(v, varId); if (c) inp = { block: c }; }
+    else if (v && typeof v === 'object') { const c = stepToBlock(v, varId); if (c) inp = { block: c }; }
+    else if (typeof v === 'number') inp = { shadow: { type: 'math_number', fields: { NUM: v } } };
+    else if (typeof v === 'boolean') inp = { block: { type: 'logic_boolean', fields: { BOOL: v ? 'TRUE' : 'FALSE' } } };
+    else if (typeof v === 'string') inp = /^(DO\d*|ELSE|STACK)$/.test(k) ? null : { shadow: { type: 'text', fields: { TEXT: v } } };
+    if (inp) (b.inputs ||= {})[k] = inp;
+  }
+  if (type === 'controls_if' && (maxIf > 0 || 'ELSE' in st)) b.extraState = { ...(maxIf > 0 ? { elseIfCount: maxIf } : {}), ...('ELSE' in st ? { hasElse: true } : {}) };
+  if (type === 'text_join' || type === 'lists_create_with') b.extraState = { itemCount: maxAdd + 1 };
+  return b;
+}
+function chainSteps(list, varId) {
+  const bs = list.map(x => stepToBlock(x, varId)).filter(Boolean);
+  for (let i = 0; i < bs.length - 1; i++) bs[i].next = { block: bs[i + 1] };
+  return bs[0] || null;
+}
+function blockToStep(b, vars) {
+  const st = { block: b.type };
+  for (const [k, v] of Object.entries(b.fields || {})) st[k] = v && typeof v === 'object' ? (vars[v.id] || v.name || '?') : v;
+  for (const [k, inp] of Object.entries(b.inputs || {})) {
+    const x = inp.block || inp.shadow; if (!x) continue;
+    if (/^(DO\d*|ELSE|STACK)$/.test(k)) st[k] = chainToSteps(x, vars);
+    else if (x.type === 'math_number') st[k] = Number(x.fields?.NUM ?? 0);
+    else if (x.type === 'text') st[k] = String(x.fields?.TEXT ?? '');
+    else st[k] = blockToStep(x, vars);
+  }
+  return st;
+}
+function chainToSteps(b, vars) { const out = []; while (b) { out.push(blockToStep(b, vars)); b = b.next?.block; } return out; }
+function projectToCompact() {
+  saveWs();
+  return { name: project.name, mode: project.mode, objects: project.objects.map(o => {
+    const vars = {}; for (const v of o.blocks?.variables || []) vars[v.id] = v.name;
+    const scripts = (o.blocks?.blocks?.blocks || []).filter(b => b.type in HATS).map(b => chainToSteps(b, vars));
+    return { name: o.name, shape: o.shape, color: o.color, pos: o.pos, rot: o.rot, scale: o.scale, ...(o.look ? { look: o.look } : {}), scripts };
+  }) };
+}
+const v3 = (v, d) => Array.isArray(v) && v.length === 3 && v.every(x => Number.isFinite(+x)) ? v.map(Number) : d;
+function compactToProject(c) {
+  skipped = 0; const used = new Set();
+  const objects = (c.objects || []).slice(0, 80).map((o, i) => {
+    const varList = [], vars = {};
+    const varId = n => vars[n] || (vars[n] = (varList.push({ name: n, id: 'v' + varList.length + uid() }), varList[varList.length - 1].id));
+    const scripts = (o.scripts || []).map((sc, j) => { const h = chainSteps(Array.isArray(sc) ? sc : [sc], varId); if (h) { h.x = 20; h.y = 20 + j * 280; } return h; }).filter(Boolean);
+    const shape = SHAPES[o.shape] ? o.shape : 'cube';
+    let name = String(o.name || 'Объект ' + (i + 1)).slice(0, 40); while (used.has(name)) name += '2'; used.add(name);
+    return { id: uid(), name, shape, color: /^#[0-9a-f]{6}$/i.test(o.color || '') ? o.color : '#3c7cf0',
+      pos: v3(o.pos, [0, shape === 'hero' ? 0.73 : 0.5, 0]), rot: v3(o.rot, [0, 0, 0]), scale: v3(o.scale, [1, 1, 1]),
+      ...(shape === 'hero' ? { look: { ...HERO_LOOK, ...(o.look || {}) } } : {}),
+      blocks: { blocks: { languageVersion: 0, blocks: scripts }, variables: varList } };
+  });
+  return { name: String(c.name || 'Игра от ИИ').slice(0, 60), mode: c.mode === '2d' ? '2d' : '3d', objects };
+}
+function catalog() {
+  return defs.map(d => {
+    let msg = d.message0;
+    (d.args0 || []).forEach((a, i) => {
+      let t = '';
+      if (a.type === 'input_value') t = a.name;
+      else if (a.type === 'input_statement') t = a.name + '=[шаги]';
+      else if (a.type === 'field_colour') t = a.name + '="#rrggbb"';
+      else if (a.type === 'field_dropdown') {
+        if (a.name === 'KEY') t = 'KEY=space|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|enter|any|a…z|0…9';
+        else { const opts = (typeof a.options === 'function' ? a.options() : a.options).map(o => o[1]);
+          t = a.name === 'OBJ' ? 'OBJ=имя объекта' + (opts.filter(v => v.startsWith('__')).length ? ' или ' + opts.filter(v => v.startsWith('__')).join('|') : '') : a.name + '=' + opts.join('|'); }
+      } else if (a.type !== 'input_dummy') t = a.name;
+      msg = msg.replace('%' + (i + 1), t ? '[' + t + ']' : '');
+    });
+    const kind = 'output' in d ? ' → значение' : !('previousStatement' in d) && 'nextStatement' in d ? ' ← СОБЫТИЕ, начало скрипта' : !('nextStatement' in d) ? ' (последний в скрипте)' : '';
+    return `${d.type}: ${msg.replace(/\s+/g, ' ').trim()}${kind}`;
+  }).join('\n');
+}
+const ASSIST_PROMPT = () => `Ты — ИИ-помощник в «Блоксфере 3D», детской среде блочного программирования (как Scratch, но с 3D и 2D). Ты собираешь игры из блоков за пользователя и объясняешь простыми словами. Пользователь — ребёнок или новичок.
+
+Отвечай ТОЛЬКО одним JSON-объектом, без текста вокруг:
+{"reply": "что ты сделал или ответ на вопрос, 1–4 коротких предложения по-русски; в конце скажи, как играть", "project": ПРОЕКТ или null}
+project = null, если пользователь только спрашивает или просит объяснить. Если меняешь или создаёшь игру, верни ПОЛНЫЙ проект целиком: все объекты и все скрипты, включая те, что не менялись.
+
+ПРОЕКТ: {"name": "...", "mode": "3d"|"2d", "objects": [ОБЪЕКТ, ...]}
+ОБЪЕКТ: {"name": "уникальное имя", "shape": ${Object.keys(SHAPES).join('|')}, "color": "#rrggbb", "pos": [x,y,z], "rot": [x,y,z] в градусах, "scale": [x,y,z] (1 = обычный), "look": {"skin","pants","hair": "#rrggbb", "hat": "hair|cap|crown|party|none"} только для hero, "scripts": [СКРИПТ, ...]}
+СКРИПТ: массив шагов, первый шаг — блок-СОБЫТИЕ. ШАГ: {"block": "тип", поля и входы}. Поле или вход-число/текст — просто значение. Вход-блок — вложенный шаг. Вход [шаги] (DO, DO0, ELSE) — массив шагов.
+Встроенные блоки:
+controls_repeat_ext: TIMES, DO=[шаги] | controls_if: IF0, DO0=[шаги], IF1, DO1…, ELSE=[шаги] | controls_whileUntil: MODE=WHILE|UNTIL, BOOL, DO | controls_for: VAR, FROM, TO, BY, DO
+math_arithmetic: OP=ADD|MINUS|MULTIPLY|DIVIDE|POWER, A, B | math_random_int: FROM, TO | math_round: OP=ROUND|ROUNDUP|ROUNDDOWN, NUM | math_modulo: DIVIDEND, DIVISOR | math_trig: OP=SIN|COS, NUM (градусы)
+logic_compare: OP=EQ|NEQ|LT|LTE|GT|GTE, A, B | logic_operation: OP=AND|OR, A, B | logic_negate: BOOL | logic_boolean: BOOL=TRUE|FALSE
+text_join: ADD0, ADD1, … | text_length: VALUE | variables_set: VAR="имя", VALUE | variables_get: VAR="имя" | math_change: VAR="имя", DELTA
+lists_create_with: ADD0… | lists_length: VALUE | lists_getIndex: MODE=GET, WHERE=FROM_START, VALUE, AT
+Блоки Блоксферы:
+${catalog()}
+
+Мир: пол на y=0, мир от −29 до 29. Куб 1×1×1 стоит при y=0.5, персонаж hero стоит при y=0.73, платформа толщиной 0.25. «Вперёд» — это −Z (в 2D — вправо). В 2D вид сбоку: x вправо, y вверх, z=0; персонажу удобно двигаться через mv_moveaxis по x.
+Советы: управление игроком — в ev_start → ct_forever проверяй sn_key и двигай; прыжок — ev_key space + ph_onground + ph_jump. Монеты и бонусы: ph_solid ON=on (сквозь можно проходить) и ev_touch с игроком. Счёт — переменная + wd_hud с text_join. Камера: wd_follow для игрока. Добавляй звуки (sd_fx), победу (sd_melody, wd_boom) и цель игры. Обычно 4–15 объектов. Копии (ct_clone + ev_clone) — для многих одинаковых врагов или монет. ИИ-блоки (ai_*) — для говорящих персонажей.
+В полях OBJ используй точные имена объектов. Не используй функции (procedures). Ответ — строго валидный JSON.`;
+
+const Assist = { turns: [], busy: false, ctl: null };
+function addMsg(kind, text) { const d = document.createElement('div'); d.className = 'msg ' + kind; d.textContent = text; $('#aiLog').append(d); $('#aiLog').scrollTop = 1e9; return d; }
+function openAssistant() { $('#aiPanel').hidden = false; updateAiStatus(); setTimeout(() => $('#aiInput').focus(), 30); }
+async function sendAssistant(text) {
+  text = text.trim(); if (!text || Assist.busy) return;
+  addMsg('user', text); $('#aiInput').value = '';
+  if (AI.mode() === 'none') { addMsg('bot', 'Чтобы я мог помогать, нужен ключ ИИ. Нажми «Ключ» вверху этой панели.'); return; }
+  if (RT.running) stopGame();
+  const bot = addMsg('bot thinking', 'Думаю… Обычно это занимает от 20 секунд до пары минут.');
+  Assist.busy = true; $('#aiSend').disabled = true; $('#aiStop').hidden = false;
+  const ctl = Assist.ctl = new AbortController();
+  const turns = [...Assist.turns.slice(-8), { role: 'user', content: 'Текущий проект:\n' + JSON.stringify(projectToCompact()) + '\n\nПросьба: ' + text }];
+  try {
+    const res = await AI.chat({ system: ASSIST_PROMPT(), turns, effort: 'medium', json: true, signal: ctl.signal,
+      onText: t => { bot.textContent = 'Собираю игру из блоков… написано ' + t.length + ' символов'; $('#aiLog').scrollTop = 1e9; } });
+    if (!res || typeof res !== 'object') throw { code: 'invalid_json' };
+    bot.classList.remove('thinking'); bot.textContent = String(res.reply || 'Готово!');
+    Assist.turns.push({ role: 'user', content: text }, { role: 'assistant', content: JSON.stringify({ reply: String(res.reply || '') }) });
+    if (res.project && Array.isArray(res.project.objects)) {
+      const before = serialize();
+      loadProject(compactToProject(res.project)); saveNow();
+      if (skipped) bot.textContent += `\n(Пропущено незнакомых блоков: ${skipped}.)`;
+      const acts = document.createElement('div'); acts.className = 'acts';
+      const run = document.createElement('button'); run.className = 'btn sm run'; run.textContent = '▶ Запустить'; run.onclick = () => startGame();
+      const undo = document.createElement('button'); undo.className = 'btn sm'; undo.textContent = '↶ Вернуть как было';
+      undo.onclick = () => { openText(before); undo.disabled = true; undo.textContent = 'Возвращено'; };
+      acts.append(run, undo); bot.append(acts);
+    }
+  } catch (e) { bot.classList.remove('thinking'); bot.textContent = aiErrText(e); }
+  finally { Assist.busy = false; $('#aiSend').disabled = false; $('#aiStop').hidden = true; $('#aiLog').scrollTop = 1e9; }
+}
+$('#aiBtn').onclick = () => $('#aiPanel').hidden ? openAssistant() : ($('#aiPanel').hidden = true);
+$('#aiClose').onclick = () => { $('#aiPanel').hidden = true; };
+$('#aiKeyBtn').onclick = () => keyDialog();
+$('#aiStop').onclick = () => Assist.ctl?.abort();
+$('#aiForm').addEventListener('submit', e => { e.preventDefault(); sendAssistant($('#aiInput').value); });
+$('#aiInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAssistant($('#aiInput').value); } });
+$('#aiChips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (c) sendAssistant(c.textContent); });
+
+/* ---------------- welcome ---------------- */
+function showWelcome() { $('#welcome').hidden = false; }
+$('#welcome').addEventListener('click', e => {
+  const w = e.target.closest('[data-w]')?.dataset.w; if (!w && e.target !== $('#welcome')) return;
+  $('#welcome').hidden = true;
+  if (w === 'example') { loadProject(exCoins()); saveNow(); setTimeout(() => startGame(), 300); }
+  if (w === 'ai') openAssistant();
+  if (w === 'empty') { const o = newObj('hero', { name: 'Персонаж', pos: [0, 0.73, 0] }); loadProject({ name: 'Моя игра', objects: [o] }); saveNow(); }
+  if (w === 'help') $('#helpBtn').onclick();
+});
 
 /* ---------------- block search ---------------- */
 const NAMES = Object.fromEntries(defs.map(d => [d.type, (d.message0.replace(/%\d/g, ' ') + ' ' + (d.tooltip || '') + ' ' + (d.args0 || []).flatMap(a => Array.isArray(a.options) ? a.options.map(o => o[0]) : []).join(' '))]));
@@ -1477,6 +1823,8 @@ const HELP = `1. Справа выбери объект. Его скрипты �
 7. «☺ Персонаж» в «Добавить» — свой человечек. Ему можно выбрать кожу, кофту, штаны и шапку, а он сам шагает и машет рукой.
 8. Объекты на сцене можно тянуть мышкой: Двигать, Вращать, Размер.
 9. Перетащи скрипт на другой объект в списке — он скопируется.
+10. ✨ ИИ-помощник вверху соберёт игру по твоему описанию или поменяет текущую. Если не понравится — «Вернуть как было».
+11. Раздел блоков «ИИ» оживляет персонажей: они отвечают на вопросы и болтают с игроком.
 Горячие клавиши: Ctrl+Enter — старт, Esc — стоп, Ctrl+Z — отменить.`;
 $('#helpBtn').onclick = () => dialog({ title: 'Как пользоваться Блоксферой', text: HELP, cancel: null, ok: 'Понятно' });
 
@@ -1485,7 +1833,8 @@ let saved = null;
 try { saved = JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) { }
 loadProject(saved && Array.isArray(saved.objects) && saved.objects.length ? saved : exCoins());
 resize(); frame();
-try { if (!localStorage.getItem('blocksphere3d.help')) { localStorage.setItem('blocksphere3d.help', '1'); $('#helpBtn').onclick(); } } catch (e) { $('#helpBtn').onclick(); }
+try { if (!localStorage.getItem('blocksphere3d.welcome')) { localStorage.setItem('blocksphere3d.welcome', '1'); showWelcome(); } } catch (e) { showWelcome(); }
+AI.init();
 addEventListener('error', e => console.error(e.error || e.message));
 </script>
 </body>
