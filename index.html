@@ -126,6 +126,13 @@ button{cursor:pointer}
 .chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 10px}
 .chip{background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-size:12.5px;font-weight:700;text-align:left}
 .chip:hover{border-color:var(--accent)}
+#micBtn{width:44px;height:44px;border-radius:50%;padding:0;justify-content:center;font-size:19px;flex-shrink:0}
+#micBtn.on{background:var(--stop);border-color:var(--stop);color:#fff;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(255,93,93,.18)}}
+@media (prefers-reduced-motion:reduce){#micBtn.on{animation:none}}
+#speakBtn.on{border-color:var(--accent);color:var(--accent)}
+.msg .say{background:none;border:0;padding:0 0 0 6px;font-size:14px;opacity:.7;vertical-align:middle}
+.msg .say:hover{opacity:1}
 .ai-form{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);align-items:flex-end}
 #aiInput{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;resize:none;height:64px;line-height:1.4}
 .welcome{width:min(620px,100%)}
@@ -286,7 +293,7 @@ button{cursor:pointer}
   </form>
 </div>
 <aside id="aiPanel" hidden aria-label="ИИ-помощник">
-  <div class="ai-head"><h2>✨ ИИ-помощник</h2><button class="btn sm" id="aiKeyBtn">Ключ</button><button class="btn sm" id="aiClose" aria-label="Закрыть">✕</button></div>
+  <div class="ai-head"><h2>✨ ИИ-помощник</h2><button class="btn sm" id="speakBtn" title="Читать ответы помощника вслух">🔊 Озвучка</button><button class="btn sm" id="aiKeyBtn">Ключ</button><button class="btn sm" id="aiClose" aria-label="Закрыть">✕</button></div>
   <div id="aiStatus"><span class="dot"></span><span id="aiStatusText">Проверяю подключение…</span></div>
   <div id="aiLog"><div class="msg bot">Привет! Я собираю игры из блоков. Напиши, какую игру хочешь, или что поменять в этой. Например: «сделай гонку, где машина объезжает конусы».</div></div>
   <div class="chips" id="aiChips">
@@ -295,7 +302,7 @@ button{cursor:pointer}
     <button class="chip">Сделай игру-викторину с говорящим ИИ-роботом</button>
     <button class="chip">Объясни, как работает мой проект</button>
   </div>
-  <form class="ai-form" id="aiForm"><textarea id="aiInput" placeholder="Какую игру сделать?"></textarea>
+  <form class="ai-form" id="aiForm"><button class="btn" id="micBtn" type="button" title="Сказать голосом" aria-label="Сказать голосом">🎤</button><textarea id="aiInput" placeholder="Напиши или нажми 🎤 и скажи, какую игру сделать"></textarea>
     <div style="display:flex;flex-direction:column;gap:6px"><button class="btn run" id="aiSend" type="submit">Отправить</button><button class="btn sm stop" id="aiStop" type="button" hidden>Стоп</button></div></form>
 </aside>
 <div class="modal" id="welcome" hidden>
@@ -1082,7 +1089,7 @@ const EX = {
   sd_instr(b, a) { a.wave = F(b, 'W'); },
   async sd_melody(b, a) { let t = 0; for (const [n, d] of MELODIES[F(b, 'M')] || []) { Snd.tone(440 * 2 ** ((n - 69) / 12), d * 0.95, a.wave, t, 0.4); t += d; } await a.wait(t); },
   sd_fx(b) { Snd.fx(F(b, 'FX')); },
-  async sd_speak(b) { const t = await this.str(b, 'TEXT'); try { const u = new SpeechSynthesisUtterance(t); u.lang = 'ru-RU'; speechSynthesis.speak(u); } catch (e) { } },
+  async sd_speak(b) { sayAloud(await this.str(b, 'TEXT')); },
   async sd_volume(b) { const v = Math.min(100, Math.max(0, await this.num(b, 'N'))); if (Snd.master) Snd.master.gain.value = 0.6 * v / 100; },
   // world
   wd_time(b) { setTime(F(b, 'T')); },
@@ -1215,7 +1222,7 @@ function stopGame() {
   for (const o of project.objects) applyObj(meshes.get(o.id), o);
   clearTrails(); RT.parts.forEach(p => { scene.remove(p.pts); p.pts.geometry.dispose(); p.pts.material.dispose(); }); RT.parts = [];
   $('#hud').textContent = ''; $('#vars').textContent = ''; $('#askForm').hidden = true; stageEl.classList.remove('running'); $('#runBadge').hidden = true; $('#runBtn').textContent = '▶ Старт';
-  try { speechSynthesis.cancel(); } catch (e) { }
+  stopSpeaking();
   resetWorld();
   if (RT.savedCam) { camera.position.copy(RT.savedCam.pos); orbit.target.copy(RT.savedCam.target); }
   orbit.enabled = true; attachGizmo();
@@ -1751,7 +1758,7 @@ function addMsg(kind, text) { const d = document.createElement('div'); d.classNa
 function openAssistant() { $('#aiPanel').hidden = false; updateAiStatus(); setTimeout(() => $('#aiInput').focus(), 30); }
 async function sendAssistant(text) {
   text = text.trim(); if (!text || Assist.busy) return;
-  addMsg('user', text); $('#aiInput').value = '';
+  addMsg('user', text); $('#aiInput').value = ''; stopSpeaking();
   if (AI.mode() === 'none') { addMsg('bot', 'Чтобы я мог помогать, нужен ключ ИИ. Нажми «Ключ» вверху этой панели.'); return; }
   if (RT.running) stopGame();
   const bot = addMsg('bot thinking', 'Думаю… Обычно это занимает от 20 секунд до пары минут.');
@@ -1762,7 +1769,9 @@ async function sendAssistant(text) {
     const res = await AI.chat({ system: ASSIST_PROMPT(), turns, effort: 'medium', json: true, signal: ctl.signal,
       onText: t => { bot.textContent = 'Собираю игру из блоков… написано ' + t.length + ' символов'; $('#aiLog').scrollTop = 1e9; } });
     if (!res || typeof res !== 'object') throw { code: 'invalid_json' };
-    bot.classList.remove('thinking'); bot.textContent = String(res.reply || 'Готово!');
+    const reply = String(res.reply || 'Готово!');
+    bot.classList.remove('thinking'); bot.textContent = reply; addSayBtn(bot, reply);
+    if (Voice.speakOn) sayAloud(reply);
     Assist.turns.push({ role: 'user', content: text }, { role: 'assistant', content: JSON.stringify({ reply: String(res.reply || '') }) });
     if (res.project && Array.isArray(res.project.objects)) {
       const before = serialize();
@@ -1778,12 +1787,77 @@ async function sendAssistant(text) {
   finally { Assist.busy = false; $('#aiSend').disabled = false; $('#aiStop').hidden = true; $('#aiLog').scrollTop = 1e9; }
 }
 $('#aiBtn').onclick = () => $('#aiPanel').hidden ? openAssistant() : ($('#aiPanel').hidden = true);
-$('#aiClose').onclick = () => { $('#aiPanel').hidden = true; };
+$('#aiClose').onclick = () => { $('#aiPanel').hidden = true; stopSpeaking(); if (Voice.listening) Voice.stop(); };
 $('#aiKeyBtn').onclick = () => keyDialog();
 $('#aiStop').onclick = () => Assist.ctl?.abort();
 $('#aiForm').addEventListener('submit', e => { e.preventDefault(); sendAssistant($('#aiInput').value); });
 $('#aiInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAssistant($('#aiInput').value); } });
 $('#aiChips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (c) sendAssistant(c.textContent); });
+
+/* ---------------- voice: dictation + reading aloud ---------------- */
+const SPEAK_LS = 'blocksphere3d.speak';
+const Voice = {
+  dict: null, tts: null, rec: null, listening: false,
+  speakOn: (() => { try { return localStorage.getItem(SPEAK_LS) !== '0'; } catch (e) { return true; } })(),
+  async init() {
+    const use = n => (window.claude?.use?.(n) || Promise.resolve(null)).catch(() => null);
+    [this.dict, this.tts] = await Promise.all([use('dictation'), use('tts')]);
+    if (this.dict) {
+      this.dict.onPartial(({ text }) => this.show(text, true));
+      this.dict.onFinal(({ text }) => { this.base = (this.base + ' ' + text).trim(); this.show('', false); });
+      this.dict.onState(({ state, reason }) => { if (state === 'idle' && this.listening) this.ended(reason && !['stopped', 'viewer_stopped', 'completed'].includes(reason) ? reason : null); });
+    }
+    micUI();
+  },
+  canListen() { return !!(this.dict || window.SpeechRecognition || window.webkitSpeechRecognition); },
+  show(partial) { $('#aiInput').value = (this.base + ' ' + (partial || '')).trim(); },
+  // must be called straight from the click
+  start() {
+    stopSpeaking();
+    this.base = $('#aiInput').value.trim(); this.listening = true; micUI();
+    if (this.dict) { this.dict.start().catch(e => this.ended(e?.code || 'upstream_error')); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const r = this.rec = new SR(); let err = null;
+    r.lang = 'ru-RU'; r.interimResults = true; r.continuous = false;
+    r.onresult = e => { let t = ''; for (const res of e.results) t += res[0].transcript; this.show(t); };
+    r.onerror = e => { err = e.error; };
+    r.onend = () => { this.rec = null; this.ended(err && err !== 'aborted' ? err : null); };
+    try { r.start(); } catch (e) { this.ended('upstream_error'); }
+  },
+  stop() { if (this.dict) this.dict.stop().catch(() => { }); else this.rec?.stop(); },
+  ended(err) {
+    if (!this.listening) return;
+    this.listening = false; micUI();
+    if (err) {
+      const msg = { 'not-allowed': 'Нет доступа к микрофону. Разреши его в настройках браузера (значок замка в адресной строке).', not_granted: 'Микрофон не разрешён.',
+        'no-speech': 'Не слышно голоса. Нажми 🎤 и говори громче.', 'audio-capture': 'Микрофон не найден.', network: 'Распознаванию речи нужен интернет.',
+        unavailable: 'Голосовой ввод здесь недоступен. Открой программу в Google Chrome.' }[err] || 'Голосовой ввод не сработал. Попробуй ещё раз.';
+      toast(msg, true); return;
+    }
+    const t = $('#aiInput').value.trim(); if (t) sendAssistant(t);
+  },
+};
+function micUI() {
+  const b = $('#micBtn'); b.hidden = !Voice.canListen(); b.classList.toggle('on', Voice.listening);
+  b.title = Voice.listening ? 'Нажми, когда закончишь говорить' : 'Сказать голосом';
+  $('#speakBtn').classList.toggle('on', Voice.speakOn); $('#speakBtn').textContent = Voice.speakOn ? '🔊 Озвучка' : '🔈 Без звука';
+}
+$('#micBtn').onclick = () => Voice.listening ? Voice.stop() : Voice.start();
+$('#speakBtn').onclick = () => {
+  Voice.speakOn = !Voice.speakOn; try { localStorage.setItem(SPEAK_LS, Voice.speakOn ? '1' : '0'); } catch (e) { }
+  if (!Voice.speakOn) stopSpeaking(); micUI(); toast(Voice.speakOn ? 'Помощник будет читать ответы вслух' : 'Озвучка выключена');
+};
+function sayAloud(text) {
+  text = String(text || '').replace(/[*_#`>]/g, '').slice(0, 1900); if (!text) return;
+  if (Voice.tts) { Voice.tts.speak(text, { language: 'ru' }).catch(e => { if (e?.code === 'not_granted') Voice.tts = null; }); return; }
+  try {
+    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'ru-RU';
+    const v = speechSynthesis.getVoices().find(v => v.lang?.toLowerCase().startsWith('ru')); if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  } catch (e) { }
+}
+function stopSpeaking() { try { Voice.tts?.stop(); } catch (e) { } try { speechSynthesis.cancel(); } catch (e) { } }
+function addSayBtn(el, text) { const b = document.createElement('button'); b.type = 'button'; b.className = 'say'; b.title = 'Прочитать вслух'; b.textContent = '🔊'; b.onclick = () => sayAloud(text); el.append(b); }
 
 /* ---------------- welcome ---------------- */
 function showWelcome() { $('#welcome').hidden = false; }
@@ -1823,7 +1897,7 @@ const HELP = `1. Справа выбери объект. Его скрипты �
 7. «☺ Персонаж» в «Добавить» — свой человечек. Ему можно выбрать кожу, кофту, штаны и шапку, а он сам шагает и машет рукой.
 8. Объекты на сцене можно тянуть мышкой: Двигать, Вращать, Размер.
 9. Перетащи скрипт на другой объект в списке — он скопируется.
-10. ✨ ИИ-помощник вверху соберёт игру по твоему описанию или поменяет текущую. Если не понравится — «Вернуть как было».
+10. ✨ ИИ-помощник вверху соберёт игру по твоему описанию или поменяет текущую. Если не понравится — «Вернуть как было». Можно говорить голосом (кнопка 🎤), а «🔊 Озвучка» читает ответы вслух.
 11. Раздел блоков «ИИ» оживляет персонажей: они отвечают на вопросы и болтают с игроком.
 Горячие клавиши: Ctrl+Enter — старт, Esc — стоп, Ctrl+Z — отменить.`;
 $('#helpBtn').onclick = () => dialog({ title: 'Как пользоваться Блоксферой', text: HELP, cancel: null, ok: 'Понятно' });
@@ -1834,7 +1908,7 @@ try { saved = JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) { }
 loadProject(saved && Array.isArray(saved.objects) && saved.objects.length ? saved : exCoins());
 resize(); frame();
 try { if (!localStorage.getItem('blocksphere3d.welcome')) { localStorage.setItem('blocksphere3d.welcome', '1'); showWelcome(); } } catch (e) { showWelcome(); }
-AI.init();
+AI.init(); Voice.init(); micUI();
 addEventListener('error', e => console.error(e.error || e.message));
 </script>
 </body>
